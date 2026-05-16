@@ -1,6 +1,4 @@
-"""
-PDF AI System — Main Flask Application
-"""
+"""Flask app — PDF upload, RAG chat, MCQ generation."""
 import os
 import uuid
 from flask import Flask, request, jsonify, render_template
@@ -17,7 +15,6 @@ from services.groq_service  import generate_summary, generate_mcqs, answer_quest
 app = Flask(__name__)
 CORS(app)
 
-# In-memory store (replace with DB in production)
 pdf_store = {}  # pdf_id -> {filename, summary, status}
 
 
@@ -45,7 +42,7 @@ def upload_pdf():
     pdf_path = os.path.join(TEMP_DIR, filename)
     file.save(pdf_path)
 
-    print(f"\n📄 Processing PDF: {file.filename} (id: {pdf_id})")
+    print(f"\nProcessing PDF: {file.filename} (id: {pdf_id})")
 
     try:
         # ── Step 1: Extract text + images ────────────────────────────────
@@ -71,7 +68,6 @@ def upload_pdf():
         print("Step 3: Processing images...")
         image_results = process_pdf_images(pages)
 
-        # Image descriptions bhi text mein add karo
         for img_result in image_results:
             all_text_parts.append(img_result["description"])
 
@@ -104,7 +100,7 @@ def upload_pdf():
             "status": "ready"
         }
 
-        print(f"✅ PDF processed successfully! Chunks: {num_chunks}")
+        print(f"PDF processed successfully! Chunks: {num_chunks}")
 
         return jsonify({
             "pdf_id": pdf_id,
@@ -116,7 +112,7 @@ def upload_pdf():
         })
 
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"Error: {e}")
         # Cleanup on error
         if os.path.exists(pdf_path):
             os.remove(pdf_path)
@@ -125,7 +121,7 @@ def upload_pdf():
 
 @app.route("/mcqs", methods=["POST"])
 def get_mcqs():
-    """PDF ke liye MCQs generate karo."""
+    """Generate MCQs from a processed PDF."""
     data = request.json
     pdf_id       = data.get("pdf_id")
     num_questions = data.get("num_questions", 5)
@@ -133,7 +129,6 @@ def get_mcqs():
     if pdf_id not in pdf_store:
         return jsonify({"error": "PDF not found"}), 404
 
-    # Summary + top chunks se MCQs generate karo
     text = pdf_store[pdf_id]["summary"]
     mcqs = generate_mcqs(text, num_questions=num_questions)
 
@@ -142,7 +137,7 @@ def get_mcqs():
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    """PDF se question poocho."""
+    """Answer a question using retrieved PDF chunks."""
     data     = request.json
     pdf_id   = data.get("pdf_id")
     question = data.get("question", "").strip()
@@ -153,13 +148,11 @@ def chat():
     if not question:
         return jsonify({"error": "Question is required"}), 400
 
-    # Relevant chunks retrieve karo
     chunks = retrieve_chunks(question, pdf_id, top_k=5)
 
     if not chunks:
         return jsonify({"answer": "I couldn't find relevant information in this document."})
 
-    # Answer generate karo
     answer = answer_question(question, chunks)
 
     return jsonify({
@@ -171,7 +164,7 @@ def chat():
 
 @app.route("/pdf/<pdf_id>", methods=["DELETE"])
 def delete_pdf(pdf_id):
-    """PDF aur uske chunks delete karo."""
+    """Delete a PDF and its chunks."""
     if pdf_id not in pdf_store:
         return jsonify({"error": "PDF not found"}), 404
 

@@ -12,7 +12,7 @@ client = Groq(api_key=GROQ_API_KEY)
 # ── Summary ───────────────────────────────────────────────────────────────────
 
 def generate_summary(text: str) -> str:
-    """PDF text ka structured summary generate karta hai."""
+    """Generate a structured text summary."""
     prompt = f"""You are an expert document analyst.
 
 Analyze the following text and provide a clear, structured summary with:
@@ -38,10 +38,7 @@ Provide a well-structured, informative summary."""
 # ── MCQs ──────────────────────────────────────────────────────────────────────
 
 def generate_mcqs(text: str, num_questions: int = 5) -> list[dict]:
-    """
-    Text se MCQs generate karta hai.
-    Returns list of dicts: {question, options: [A,B,C,D], answer, explanation}
-    """
+    """Generate multiple choice questions from text."""
     prompt = f"""You are an expert educator. Create {num_questions} multiple choice questions from the text below.
 
 RULES:
@@ -80,7 +77,6 @@ Return ONLY the JSON array, no extra text."""
     import json
     raw = response.choices[0].message.content.strip()
 
-    # JSON extract karo (kabhi kabhi model extra text add karta hai)
     start = raw.find("[")
     end   = raw.rfind("]") + 1
     if start != -1 and end > start:
@@ -92,9 +88,7 @@ Return ONLY the JSON array, no extra text."""
 # ── Q&A (Chat) ────────────────────────────────────────────────────────────────
 
 def answer_question(question: str, context_chunks: list[str]) -> str:
-    """
-    Retrieved chunks ke basis pe user question ka jawab deta hai.
-    """
+    """Answer a question using retrieved context chunks."""
     context = "\n\n---\n\n".join(context_chunks)
 
     prompt = f"""You are a helpful assistant answering questions about a document.
@@ -121,15 +115,10 @@ Provide a clear, accurate answer based on the context above."""
 # ── Image Understanding ───────────────────────────────────────────────────────
 
 def understand_image(image_path: str, context: str = "") -> str:
-    """
-    Image ko base64 mein convert karke Groq Vision ko bhejta hai.
-    Returns image description/explanation.
-    """
-    # Image ko base64 encode karo
+    """Send an image to Groq Vision and return a description."""
     with open(image_path, "rb") as f:
         img_data = base64.b64encode(f.read()).decode("utf-8")
 
-    # Extension se media type
     ext = image_path.split(".")[-1].lower()
     media_type_map = {"jpg": "jpeg", "jpeg": "jpeg", "png": "png", "gif": "gif", "webp": "webp"}
     media_type = f"image/{media_type_map.get(ext, 'png')}"

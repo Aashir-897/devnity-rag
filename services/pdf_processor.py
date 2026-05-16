@@ -1,6 +1,4 @@
-"""
-PDF Processor — text + image extract karta hai PyMuPDF se
-"""
+"""PyMuPDF-based text and image extraction from PDFs."""
 import os
 import re
 import fitz   # PyMuPDF
@@ -10,15 +8,7 @@ from config import TEMP_DIR, IMAGES_DIR, MIN_IMAGE_WIDTH, MIN_IMAGE_HEIGHT
 # ── Main Entry Point ──────────────────────────────────────────────────────────
 
 def process_pdf(pdf_path: str) -> dict:
-    """
-    PDF se text aur images extract karta hai.
-    Returns:
-        {
-            "pages": [{"page_num": 1, "text": "...", "images": ["path1", ...]}, ...],
-            "full_text": "...",
-            "total_pages": N
-        }
-    """
+    """Extract text and images from a PDF."""
     doc = fitz.open(pdf_path)
     pages = []
     full_text_parts = []
@@ -52,7 +42,7 @@ def process_pdf(pdf_path: str) -> dict:
 # ── Image Extraction ──────────────────────────────────────────────────────────
 
 def extract_images_from_page(doc, page, page_num: int) -> list[str]:
-    """Page se meaningful images extract karke save karta hai."""
+    """Extract and save meaningful images from a page."""
     saved_paths = []
     image_list = page.get_images(full=True)
 
@@ -63,7 +53,6 @@ def extract_images_from_page(doc, page, page_num: int) -> list[str]:
             width  = base_image["width"]
             height = base_image["height"]
 
-            # Choti/decorative images skip karo
             if width < MIN_IMAGE_WIDTH or height < MIN_IMAGE_HEIGHT:
                 continue
 
@@ -78,7 +67,7 @@ def extract_images_from_page(doc, page, page_num: int) -> list[str]:
             saved_paths.append(save_path)
 
         except Exception as e:
-            print(f"⚠️  Image extract error (page {page_num}, img {img_index}): {e}")
+            print(f"Image extract error (page {page_num}, img {img_index}): {e}")
             continue
 
     return saved_paths
@@ -87,7 +76,7 @@ def extract_images_from_page(doc, page, page_num: int) -> list[str]:
 # ── Text Cleaning ─────────────────────────────────────────────────────────────
 
 def clean_text(text: str) -> str:
-    """Raw PDF text clean karta hai."""
+    """Clean up raw PDF text."""
     if not text:
         return ""
 
@@ -108,5 +97,5 @@ def clean_text(text: str) -> str:
 # ── Helper ────────────────────────────────────────────────────────────────────
 
 def is_text_empty(text: str) -> bool:
-    """Check karta hai ke meaningful text hai ya nahi."""
+    """Check if a page has meaningful text."""
     return len(text.strip()) < 50
