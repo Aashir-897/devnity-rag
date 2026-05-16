@@ -7,6 +7,7 @@ build/
 
 # Virtual environment
 myenv310/
+venv/
 
 # Environment variables (contains GROQ_API_KEY)
 .env
