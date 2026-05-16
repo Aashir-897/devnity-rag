@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF Intelligence System</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --border: #1e1e2e;
+    --accent: #7c6af7;
+    --accent2: #f7a26a;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --success: #4ade80;
+    --error: #f87171;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(124,106,247,.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,106,247,.04) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container { max-width: 960px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+  /* ── Header ── */
+  header {
+    padding: 48px 0 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+
+  .logo-text { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
+  .logo-sub { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; margin-top: 1px; }
+
+  .status-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--success);
+    border: 1px solid rgba(74,222,128,.2);
+    padding: 4px 10px;
+    border-radius: 20px;
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  .status-dot {
+    width: 6px; height: 6px;
+    background: var(--success);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* ── Upload Zone ── */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 16px;
+    padding: 56px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .25s ease;
+    background: var(--surface);
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 32px;
+  }
+
+  .upload-zone::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 0%, rgba(124,106,247,.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(124,106,247,.06);
+  }
+
+  .upload-icon { font-size: 48px; margin-bottom: 16px; }
+
+  .upload-title {
+    font-size: 22px; font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .upload-sub {
+    color: var(--muted);
+    font-size: 14px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .upload-btn {
+    display: inline-block;
+    margin-top: 20px;
+    padding: 10px 24px;
+    background: linear-gradient(135deg, var(--accent), #5a4fcf);
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform .15s, box-shadow .15s;
+    border: none;
+    color: white;
+  }
+
+  .upload-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(124,106,247,.3); }
+
+  /* ── Progress ── */
+  .progress-wrap {
+    display: none;
+    margin-bottom: 32px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+  }
+
+  .progress-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .progress-bar-bg {
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 3px;
+    width: 0%;
+    transition: width .4s ease;
+    animation: shimmer 1.5s infinite;
+    background-size: 200% 100%;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  /* ── Panels ── */
+  .panels { display: none; gap: 16px; flex-direction: column; }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+  }
+
+  .panel-title {
+    font-size: 14px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .panel-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    background: rgba(124,106,247,.15);
+    color: var(--accent);
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  .panel-body { padding: 20px; }
+
+  /* ── Summary ── */
+  .summary-text {
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--text);
+    white-space: pre-wrap;
+  }
+
+  /* ── MCQs ── */
+  .mcq-controls {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .mcq-count {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    width: 80px;
+  }
+
+  .btn {
+    padding: 9px 20px;
+    border-radius: 8px;
+    border: none;
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .15s;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #5a4fcf);
+    color: white;
+  }
+
+  .btn-primary:hover { box-shadow: 0 4px 16px rgba(124,106,247,.3); transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+  .mcq-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 14px;
+    transition: border-color .2s;
+  }
+
+  .mcq-question {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 14px;
+    line-height: 1.5;
+  }
+
+  .mcq-options { display: flex; flex-direction: column; gap: 8px; }
+
+  .mcq-option {
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    font-size: 13px;
+    transition: all .15s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg);
+  }
+
+  .mcq-option:hover:not(.selected):not(.correct):not(.wrong) {
+    border-color: var(--accent);
+    background: rgba(124,106,247,.08);
+  }
+
+  .mcq-option.correct { border-color: var(--success); background: rgba(74,222,128,.1); }
+  .mcq-option.wrong   { border-color: var(--error);   background: rgba(248,113,113,.1); }
+
+  .opt-label {
+    width: 22px; height: 22px;
+    border-radius: 6px;
+    background: var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .mcq-explanation {
+    display: none;
+    margin-top: 12px;
+    padding: 12px;
+    background: rgba(124,106,247,.08);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+    border-left: 3px solid var(--accent);
+  }
+
+  /* ── Chat ── */
+  .chat-messages {
+    min-height: 200px;
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .msg {
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 14px;
+    line-height: 1.6;
+    max-width: 85%;
+  }
+
+  .msg-user {
+    background: linear-gradient(135deg, rgba(124,106,247,.2), rgba(124,106,247,.1));
+    border: 1px solid rgba(124,106,247,.3);
+    align-self: flex-end;
+    font-weight: 600;
+  }
+
+  .msg-ai {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    align-self: flex-start;
+  }
+
+  .msg-ai .msg-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .chat-input-wrap {
+    display: flex;
+    gap: 10px;
+  }
+
+  .chat-input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    outline: none;
+    transition: border-color .15s;
+  }
+
+  .chat-input:focus { border-color: var(--accent); }
+
+  /* ── PDF Info Bar ── */
+  .pdf-info {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 20px;
+    margin-bottom: 24px;
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .pdf-info-left { display: flex; align-items: center; gap: 12px; }
+  .pdf-name { font-size: 14px; font-weight: 600; }
+  .pdf-meta { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); }
+
+  .chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 32px;
+    color: var(--muted);
+    font-size: 13px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .6s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .score-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    background: rgba(124,106,247,.15);
+    color: var(--accent);
+    border: 1px solid rgba(124,106,247,.2);
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="logo">
+      <div class="logo-icon">📄</div>
+      <div>
+        <div class="logo-text">PDF Intelligence</div>
+        <div class="logo-sub">v1.0 · powered by groq + bge</div>
+      </div>
+    </div>
+    <div class="status-badge">
+      <div class="status-dot"></div>
+      system online
+    </div>
+  </header>
+
+  <!-- Upload Zone -->
+  <div class="upload-zone" id="uploadZone">
+    <div class="upload-icon">⬆</div>
+    <div class="upload-title">Drop your PDF here</div>
+    <div class="upload-sub">or click to browse · max 50MB</div>
+    <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+      Choose PDF
+    </button>
+    <input type="file" id="fileInput" accept=".pdf" style="display:none" onchange="handleFile(this.files[0])">
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-label" id="progressLabel">Uploading PDF...</div>
+    <div class="progress-bar-bg">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+  </div>
+
+  <!-- PDF Info Bar -->
+  <div class="pdf-info" id="pdfInfo">
+    <div class="pdf-info-left">
+      <span style="font-size:20px">📄</span>
+      <div>
+        <div class="pdf-name" id="pdfName">—</div>
+        <div class="pdf-meta" id="pdfMeta">—</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <span class="chip" id="pagesChip">— pages</span>
+      <span class="chip" id="chunksChip">— chunks</span>
+    </div>
+  </div>
+
+  <!-- Panels -->
+  <div class="panels" id="panels">
+
+    <!-- Summary Panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          📝 Summary
+          <span class="panel-tag">AI Generated</span>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="summary-text" id="summaryText"></div>
+      </div>
+    </div>
+
+    <!-- MCQ Panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          🎯 MCQ Quiz
+          <span class="panel-tag">Auto Generated</span>
+        </div>
+        <div id="mcqScore" class="score-badge" style="display:none"></div>
+      </div>
+      <div class="panel-body">
+        <div class="mcq-controls">
+          <input type="number" class="mcq-count" id="mcqCount" value="5" min="1" max="15">
+          <button class="btn btn-primary" id="mcqBtn" onclick="generateMCQs()">Generate MCQs</button>
+        </div>
+        <div id="mcqContainer"><div class="empty-state">Click "Generate MCQs" to start</div></div>
+      </div>
+    </div>
+
+    <!-- Chat Panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          💬 Chat with PDF
+          <span class="panel-tag">RAG Powered</span>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="chat-messages" id="chatMessages">
+          <div class="empty-state">Ask anything about your document...</div>
+        </div>
+        <div class="chat-input-wrap">
+          <input type="text" class="chat-input" id="chatInput"
+                 placeholder="Ask a question..." onkeydown="if(event.key==='Enter') sendChat()">
+          <button class="btn btn-primary" id="chatBtn" onclick="sendChat()">Send</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /panels -->
+
+</div><!-- /container -->
+
+<script>
+let currentPdfId = null;
+let mcqAnswered  = 0;
+let mcqCorrect   = 0;
+let mcqTotal     = 0;
+
+// ── Drag & Drop ───────────────────────────────────────────────────────────────
+const zone = document.getElementById('uploadZone');
+
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+zone.addEventListener('drop', e => {
+  e.preventDefault();
+  zone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f && f.name.endsWith('.pdf')) handleFile(f);
+});
+
+
+// ── Upload ────────────────────────────────────────────────────────────────────
+async function handleFile(file) {
+  if (!file) return;
+
+  const steps = [
+    { label: 'Uploading PDF...', pct: 10 },
+    { label: 'Extracting text + images...', pct: 30 },
+    { label: 'Running OCR if needed...', pct: 50 },
+    { label: 'Creating embeddings...', pct: 75 },
+    { label: 'Generating summary...', pct: 90 },
+    { label: 'Ready!', pct: 100 },
+  ];
+
+  // Show progress
+  document.getElementById('uploadZone').style.display = 'none';
+  const pw = document.getElementById('progressWrap');
+  pw.style.display = 'block';
+
+  let stepIdx = 0;
+  const stepInterval = setInterval(() => {
+    if (stepIdx < steps.length - 1) {
+      setProgress(steps[stepIdx].label, steps[stepIdx].pct);
+      stepIdx++;
+    }
+  }, 1200);
+
+  try {
+    const form = new FormData();
+    form.append('pdf', file);
+
+    const res  = await fetch('/upload', { method: 'POST', body: form });
+    const data = await res.json();
+
+    clearInterval(stepInterval);
+
+    if (!res.ok) {
+      showError(data.error || 'Upload failed');
+      return;
+    }
+
+    setProgress('Ready!', 100);
+    await new Promise(r => setTimeout(r, 600));
+
+    currentPdfId = data.pdf_id;
+    showResults(data);
+
+  } catch (err) {
+    clearInterval(stepInterval);
+    showError('Connection error: ' + err.message);
+  }
+}
+
+function setProgress(label, pct) {
+  document.getElementById('progressLabel').textContent = label;
+  document.getElementById('progressBar').style.width = pct + '%';
+}
+
+function showError(msg) {
+  document.getElementById('progressWrap').style.display = 'none';
+  document.getElementById('uploadZone').style.display = 'block';
+  alert('❌ ' + msg);
+}
+
+function showResults(data) {
+  document.getElementById('progressWrap').style.display = 'none';
+
+  // PDF info bar
+  const info = document.getElementById('pdfInfo');
+  info.style.display  = 'flex';
+  document.getElementById('pdfName').textContent   = data.filename;
+  document.getElementById('pdfMeta').textContent   = 'ID: ' + data.pdf_id;
+  document.getElementById('pagesChip').textContent  = data.total_pages + ' pages';
+  document.getElementById('chunksChip').textContent = data.num_chunks + ' chunks';
+
+  // Summary
+  document.getElementById('summaryText').textContent = data.summary;
+
+  // Show panels
+  document.getElementById('panels').style.display = 'flex';
+}
+
+
+// ── MCQs ──────────────────────────────────────────────────────────────────────
+async function generateMCQs() {
+  if (!currentPdfId) return;
+
+  const n   = parseInt(document.getElementById('mcqCount').value) || 5;
+  const btn = document.getElementById('mcqBtn');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Generating...';
+  document.getElementById('mcqContainer').innerHTML = '<div class="empty-state"><span class="spinner"></span>Creating questions...</div>';
+  document.getElementById('mcqScore').style.display = 'none';
+
+  try {
+    const res  = await fetch('/mcqs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pdf_id: currentPdfId, num_questions: n })
+    });
+    const data = await res.json();
+
+    if (!res.ok) { alert('Error: ' + data.error); return; }
+
+    renderMCQs(data.mcqs);
+  } catch (err) {
+    alert('Error: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Generate MCQs';
+  }
+}
+
+function renderMCQs(mcqs) {
+  mcqAnswered = 0; mcqCorrect = 0; mcqTotal = mcqs.length;
+
+  const container = document.getElementById('mcqContainer');
+  container.innerHTML = '';
+
+  mcqs.forEach((mcq, qi) => {
+    const card = document.createElement('div');
+    card.className = 'mcq-card';
+    card.id = `mcq-${qi}`;
+
+    const opts = Object.entries(mcq.options).map(([key, val]) => `
+      <div class="mcq-option" id="opt-${qi}-${key}" onclick="selectAnswer(${qi}, '${key}', '${mcq.answer}', \`${mcq.explanation.replace(/`/g,"'")}\`)">
+        <span class="opt-label">${key}</span>
+        ${val}
+      </div>
+    `).join('');
+
+    card.innerHTML = `
+      <div class="mcq-question">Q${qi + 1}. ${mcq.question}</div>
+      <div class="mcq-options">${opts}</div>
+      <div class="mcq-explanation" id="exp-${qi}">💡 ${mcq.explanation}</div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function selectAnswer(qi, selected, correct, explanation) {
+  // Already answered?
+  if (document.getElementById(`opt-${qi}-A`).style.pointerEvents === 'none') return;
+
+  mcqAnswered++;
+  if (selected === correct) mcqCorrect++;
+
+  // Mark options
+  ['A','B','C','D'].forEach(k => {
+    const el = document.getElementById(`opt-${qi}-${k}`);
+    if (!el) return;
+    el.style.pointerEvents = 'none';
+    if (k === correct) el.classList.add('correct');
+    else if (k === selected) el.classList.add('wrong');
+  });
+
+  // Show explanation
+  document.getElementById(`exp-${qi}`).style.display = 'block';
+
+  // Update score
+  if (mcqAnswered === mcqTotal) {
+    const badge = document.getElementById('mcqScore');
+    badge.textContent = `Score: ${mcqCorrect}/${mcqTotal}`;
+    badge.style.display = 'block';
+  }
+}
+
+
+// ── Chat ──────────────────────────────────────────────────────────────────────
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const q = input.value.trim();
+  if (!q || !currentPdfId) return;
+
+  input.value = '';
+  const msgs = document.getElementById('chatMessages');
+
+  // Clear empty state
+  const empty = msgs.querySelector('.empty-state');
+  if (empty) empty.remove();
+
+  // User message
+  const userMsg = document.createElement('div');
+  userMsg.className = 'msg msg-user';
+  userMsg.textContent = q;
+  msgs.appendChild(userMsg);
+
+  // AI thinking
+  const aiMsg = document.createElement('div');
+  aiMsg.className = 'msg msg-ai';
+  aiMsg.innerHTML = '<div class="msg-label">PDF AI</div><span class="spinner"></span> Thinking...';
+  msgs.appendChild(aiMsg);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  document.getElementById('chatBtn').disabled = true;
+
+  try {
+    const res  = await fetch('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pdf_id: currentPdfId, question: q })
+    });
+    const data = await res.json();
+
+    aiMsg.innerHTML = `<div class="msg-label">PDF AI</div>${data.answer || data.error}`;
+  } catch (err) {
+    aiMsg.innerHTML = `<div class="msg-label">PDF AI</div>Error: ${err.message}`;
+  } finally {
+    document.getElementById('chatBtn').disabled = false;
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+}
+</script>
+</body>
+</html>

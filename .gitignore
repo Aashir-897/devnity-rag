@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+myenv310/
+
+# Environment variables (contains GROQ_API_KEY)
+.env
+
+# Runtime data
+storage/temp/
+storage/images/
+vector_db/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+
+AGENTS.md
