@@ -1,18 +1,59 @@
-"""
-Groq Service — LLM calls: summary, MCQs, Q&A, image understanding
-"""
+"""LLM calls — Hugging Face (primary), Groq (fallback)."""
 import base64
-from groq import Groq
-from config import GROQ_API_KEY, GROQ_TEXT_MODEL, GROQ_VISION_MODEL
+import json
+from config import (
+    HF_TOKEN, HF_TEXT_MODEL, HF_VISION_MODEL,
+    GROQ_API_KEY, GROQ_TEXT_MODEL, GROQ_VISION_MODEL,
+)
+
+_hf_client = None
+_groq_client = None
 
 
-client = Groq(api_key=GROQ_API_KEY)
+def _get_hf():
+    global _hf_client
+    if _hf_client is None and HF_TOKEN:
+        from openai import OpenAI
+        _hf_client = OpenAI(
+            base_url="https://router.huggingface.co/v1",
+            api_key=HF_TOKEN,
+        )
+    return _hf_client
+
+
+def _get_groq():
+    global _groq_client
+    if _groq_client is None and GROQ_API_KEY:
+        from groq import Groq
+        _groq_client = Groq(api_key=GROQ_API_KEY)
+    return _groq_client
+
+
+def _chat(messages, model_hf, model_groq, temperature=0.3, max_tokens=1000, image_data=None):
+    if image_data:
+        content = [
+            {"type": "image_url", "image_url": {"url": f"data:{image_data['media_type']};base64,{image_data['data']}"}},
+            {"type": "text", "text": messages[0]["content"]},
+        ]
+        messages = [{"role": "user", "content": content}]
+
+    hf = _get_hf()
+    if hf:
+        try:
+            return hf.chat.completions.create(model=model_hf, messages=messages, temperature=temperature, max_tokens=max_tokens).choices[0].message.content
+        except Exception as e:
+            print(f"HF failed, fallback to Groq: {e}")
+
+    groq = _get_groq()
+    if groq:
+        return groq.chat.completions.create(model=model_groq, messages=messages, temperature=temperature, max_tokens=max_tokens).choices[0].message.content
+
+    raise RuntimeError("No LLM available — set HF_TOKEN or GROQ_API_KEY")
 
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 
 def generate_summary(text: str) -> str:
-    """Generate a structured text summary."""
     prompt = f"""You are an expert document analyst.
 
 Analyze the following text and provide a clear, structured summary with:
@@ -26,19 +67,18 @@ TEXT:
 
 Provide a well-structured, informative summary."""
 
-    response = client.chat.completions.create(
-        model=GROQ_TEXT_MODEL,
+    return _chat(
         messages=[{"role": "user", "content": prompt}],
+        model_hf=HF_TEXT_MODEL,
+        model_groq=GROQ_TEXT_MODEL,
         temperature=0.3,
-        max_tokens=1500
+        max_tokens=1500,
     )
-    return response.choices[0].message.content
 
 
 # ── MCQs ──────────────────────────────────────────────────────────────────────
 
 def generate_mcqs(text: str, num_questions: int = 5) -> list[dict]:
-    """Generate multiple choice questions from text."""
     prompt = f"""You are an expert educator. Create {num_questions} multiple choice questions from the text below.
 
 RULES:
@@ -67,18 +107,16 @@ TEXT:
 
 Return ONLY the JSON array, no extra text."""
 
-    response = client.chat.completions.create(
-        model=GROQ_TEXT_MODEL,
+    raw = _chat(
         messages=[{"role": "user", "content": prompt}],
+        model_hf=HF_TEXT_MODEL,
+        model_groq=GROQ_TEXT_MODEL,
         temperature=0.4,
-        max_tokens=2000
-    )
-
-    import json
-    raw = response.choices[0].message.content.strip()
+        max_tokens=2000,
+    ).strip()
 
     start = raw.find("[")
-    end   = raw.rfind("]") + 1
+    end = raw.rfind("]") + 1
     if start != -1 and end > start:
         raw = raw[start:end]
 
@@ -88,7 +126,6 @@ Return ONLY the JSON array, no extra text."""
 # ── Q&A (Chat) ────────────────────────────────────────────────────────────────
 
 def answer_question(question: str, context_chunks: list[str]) -> str:
-    """Answer a question using retrieved context chunks."""
     context = "\n\n---\n\n".join(context_chunks)
 
     prompt = f"""You are a helpful assistant answering questions about a document.
@@ -103,25 +140,24 @@ QUESTION: {question}
 
 Provide a clear, accurate answer based on the context above."""
 
-    response = client.chat.completions.create(
-        model=GROQ_TEXT_MODEL,
+    return _chat(
         messages=[{"role": "user", "content": prompt}],
+        model_hf=HF_TEXT_MODEL,
+        model_groq=GROQ_TEXT_MODEL,
         temperature=0.2,
-        max_tokens=1000
+        max_tokens=1000,
     )
-    return response.choices[0].message.content
 
 
 # ── Image Understanding ───────────────────────────────────────────────────────
 
 def understand_image(image_path: str, context: str = "") -> str:
-    """Send an image to Groq Vision and return a description."""
     with open(image_path, "rb") as f:
         img_data = base64.b64encode(f.read()).decode("utf-8")
 
     ext = image_path.split(".")[-1].lower()
-    media_type_map = {"jpg": "jpeg", "jpeg": "jpeg", "png": "png", "gif": "gif", "webp": "webp"}
-    media_type = f"image/{media_type_map.get(ext, 'png')}"
+    media_map = {"jpg": "jpeg", "jpeg": "jpeg", "png": "png", "gif": "gif", "webp": "webp"}
+    media_type = f"image/{media_map.get(ext, 'png')}"
 
     context_part = f"\nDocument context: {context[:500]}" if context else ""
 
@@ -135,26 +171,11 @@ Describe:
 
 Be specific and detailed."""
 
-    response = client.chat.completions.create(
-        model=GROQ_VISION_MODEL,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:{media_type};base64,{img_data}"
-                        }
-                    },
-                    {
-                        "type": "text",
-                        "text": prompt
-                    }
-                ]
-            }
-        ],
+    return _chat(
+        messages=[{"role": "user", "content": prompt}],
+        model_hf=HF_VISION_MODEL,
+        model_groq=GROQ_VISION_MODEL,
         temperature=0.3,
-        max_tokens=800
+        max_tokens=800,
+        image_data={"data": img_data, "media_type": media_type},
     )
-    return response.choices[0].message.content

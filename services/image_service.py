@@ -1,19 +1,33 @@
 """Route PDF images to OCR or Groq Vision for text descriptions."""
 import os
+import time
 from services.groq_service import understand_image
 from services.ocr_service  import run_ocr_on_image
-from config import MIN_IMAGE_WIDTH, MIN_IMAGE_HEIGHT
+from config import (
+    MIN_IMAGE_WIDTH, MIN_IMAGE_HEIGHT,
+    MAX_IMAGES_TOTAL, MAX_IMAGES_PER_PAGE, VISION_DELAY_SEC,
+)
 
 
 def process_pdf_images(pages: list[dict]) -> list[dict]:
-    """Process all images across all PDF pages."""
+    """Process all images across all PDF pages with limits."""
     image_descriptions = []
+    total_processed = 0
 
     for page in pages:
         page_num = page["page_num"]
         images   = page.get("images", [])
+        page_count = 0
 
         for image_path in images:
+            if total_processed >= MAX_IMAGES_TOTAL:
+                print(f"   Max images ({MAX_IMAGES_TOTAL}) reached, skipping remaining")
+                return image_descriptions
+
+            if page_count >= MAX_IMAGES_PER_PAGE:
+                print(f"   Page {page_num}: max {MAX_IMAGES_PER_PAGE} images, skipping rest")
+                break
+
             if not os.path.exists(image_path):
                 continue
 
@@ -27,6 +41,8 @@ def process_pdf_images(pages: list[dict]) -> list[dict]:
 
             if result:
                 image_descriptions.append(result)
+                total_processed += 1
+                page_count += 1
 
     return image_descriptions
 
@@ -45,6 +61,7 @@ def process_single_image(image_path: str, page_context: str = "", page_num: int 
             }
         else:
             vision_desc = understand_image(image_path, context=page_context)
+            time.sleep(VISION_DELAY_SEC)
 
             if vision_desc:
                 return {

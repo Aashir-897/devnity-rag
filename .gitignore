@@ -26,5 +26,7 @@ vector_db/
 .DS_Store
 Thumbs.db
 
+test.py     
+error.txt
 
 AGENTS.md

@@ -1,5 +1,8 @@
 """PaddleOCR for scanned PDF pages."""
 import os
+
+os.environ["DNNL_DEFAULT_FPMATH_MODE"] = "BF16"
+
 import fitz  # PyMuPDF
 from config import TEMP_DIR
 
