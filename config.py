@@ -43,3 +43,4 @@ TOP_K_CHUNKS = 5
 # ── Flask ─────────────────────────────────────────────
 DEBUG = os.getenv("DEBUG", "true").lower() == "true"
 PORT  = int(os.getenv("PORT", 5000))
+HOST  = os.getenv("HOST", "127.0.0.1")

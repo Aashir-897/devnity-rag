@@ -7,7 +7,7 @@ import threading
 from flask import Flask, request, jsonify, render_template, Response
 from flask_cors import CORS
 
-from config import TEMP_DIR, IMAGES_DIR, PORT, DEBUG
+from config import TEMP_DIR, IMAGES_DIR, PORT, HOST, DEBUG
 from services.pdf_processor import process_pdf, is_text_empty
 from services.ocr_service   import run_ocr_on_pdf_page
 from services.image_service import process_pdf_images, cleanup_images
@@ -233,4 +233,4 @@ if __name__ == "__main__":
             except Exception:
                 pass
 
-    app.run(debug=DEBUG, port=PORT)
+    app.run(debug=DEBUG, host=HOST, port=PORT)
