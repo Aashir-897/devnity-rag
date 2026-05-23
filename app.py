@@ -12,7 +12,7 @@ from services.pdf_processor import process_pdf, is_text_empty
 from services.ocr_service   import run_ocr_on_pdf_page
 from services.image_service import process_pdf_images, cleanup_images
 from services.embeddings    import chunk_text, store_chunks, retrieve_chunks, delete_pdf_chunks
-from services.groq_service  import generate_summary, generate_mcqs, answer_question
+from services.groq_service  import generate_summary, generate_mcqs, generate_qa_pairs, answer_question
 
 
 app = Flask(__name__)
@@ -88,6 +88,7 @@ def _process_pdf_background(pdf_path, filename, pdf_id):
 
         pdf_store[pdf_id] = {
             "filename": filename,
+            "full_text": combined_text,
             "summary": summary,
             "num_chunks": num_chunks,
             "total_pages": result["total_pages"],
@@ -166,10 +167,26 @@ def get_mcqs():
     if pdf_id not in pdf_store:
         return jsonify({"error": "PDF not found"}), 404
 
-    text = pdf_store[pdf_id]["summary"]
+    text = pdf_store[pdf_id].get("full_text") or pdf_store[pdf_id]["summary"]
     mcqs = generate_mcqs(text, num_questions=num_questions)
 
     return jsonify({"pdf_id": pdf_id, "mcqs": mcqs})
+
+
+@app.route("/qa", methods=["POST"])
+def get_qa():
+    """Generate Q&A pairs from a processed PDF."""
+    data = request.json
+    pdf_id    = data.get("pdf_id")
+    num_pairs = data.get("num_pairs", 5)
+
+    if pdf_id not in pdf_store:
+        return jsonify({"error": "PDF not found"}), 404
+
+    text = pdf_store[pdf_id].get("full_text") or pdf_store[pdf_id]["summary"]
+    pairs = generate_qa_pairs(text, num_pairs=num_pairs)
+
+    return jsonify({"pdf_id": pdf_id, "qa_pairs": pairs})
 
 
 @app.route("/chat", methods=["POST"])

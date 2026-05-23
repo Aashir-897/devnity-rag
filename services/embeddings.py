@@ -19,7 +19,7 @@ def get_embedding_model():
     global _embedding_model
     if _embedding_model is None:
         print("Loading embedding model...")
-        _embedding_model = SentenceTransformer(EMBEDDING_MODEL)
+        _embedding_model = SentenceTransformer(EMBEDDING_MODEL, device="cpu")
         print("Embedding model loaded")
     return _embedding_model
 

@@ -56,14 +56,17 @@ def _chat(messages, model_hf, model_groq, temperature=0.3, max_tokens=1000, imag
 def generate_summary(text: str) -> str:
     prompt = f"""You are an expert document analyst.
 
-Analyze the following text and provide a clear, structured summary with:
-1. **Main Topic** — what this document is about (2-3 sentences)
-2. **Key Points** — 5-8 bullet points of the most important information
-3. **Important Concepts** — list any technical terms or key concepts explained
-4. **Conclusion** — main takeaway in 2-3 sentences
+Analyze the following text and provide a clear, structured summary.
+Adjust the depth and length of your summary to match the document — concise for short or simple documents, detailed for long or complex ones.
+
+Include:
+1. **Main Topic** — what this document is about
+2. **Key Points** — the most important information, proportional to content
+3. **Important Concepts** — any technical terms or key concepts explained
+4. **Conclusion** — main takeaway
 
 TEXT:
-{text[:6000]}
+{text[:10000]}
 
 Provide a well-structured, informative summary."""
 
@@ -79,9 +82,21 @@ Provide a well-structured, informative summary."""
 # ── MCQs ──────────────────────────────────────────────────────────────────────
 
 def generate_mcqs(text: str, num_questions: int = 5) -> list[dict]:
-    prompt = f"""You are an expert educator. Create {num_questions} multiple choice questions from the text below.
+    prompt = f"""You are an expert question writer who adapts to any document type.
 
-RULES:
+First, analyze the document below and determine its primary content type: educational, technical, business, creative/literary, news, or general.
+
+Then generate up to {num_questions} well-crafted multiple choice questions that are appropriate for that content type. Choose a number proportional to the content — fewer for short documents, more for detailed ones.
+
+TAILOR QUESTIONS TO THE CONTENT TYPE:
+- **Educational** → comprehension, concept recall, application, and understanding
+- **Technical** → procedures, specifications, configurations, and factual details
+- **Business** → strategies, data interpretation, market analysis, and decision points
+- **Creative/Literary** → themes, characters, plot, narrative techniques, and symbolism
+- **News** → key facts, chronology, implications, stakeholders, and context
+- **General** → main ideas, important details, and key takeaways
+
+RULES for ALL types:
 - Questions must be based ONLY on the provided text
 - Each question must have exactly 4 options (A, B, C, D)
 - Only one correct answer per question
@@ -103,7 +118,7 @@ RESPONSE FORMAT (strict JSON array):
 ]
 
 TEXT:
-{text[:5000]}
+{text[:10000]}
 
 Return ONLY the JSON array, no extra text."""
 
@@ -123,12 +138,72 @@ Return ONLY the JSON array, no extra text."""
     return json.loads(raw)
 
 
+# ── Q&A Pairs ──────────────────────────────────────────────────────────────────
+
+def generate_qa_pairs(text: str, num_pairs: int = 5) -> list[dict]:
+    prompt = f"""You are an expert question writer who adapts to any document type.
+
+First, analyze the document below and determine its primary content type: educational, technical, business, creative/literary, news, or general.
+
+Then generate up to {num_pairs} question-answer pairs that are appropriate for that content type. Choose a number proportional to the content — fewer for short documents, more for detailed ones.
+
+TAILOR Q&A TO THE CONTENT TYPE:
+- **Educational** → concept comprehension, definitions, explanations, "why/how" questions
+- **Technical** → procedures, specifications, troubleshooting, factual recall
+- **Business** → strategy rationale, data insights, decision analysis
+- **Creative/Literary** → theme analysis, character motivation, plot significance
+- **News** → key facts, implications, stakeholder impact
+- **General** → main ideas and important takeaways
+
+RULES:
+- Questions and answers must be based ONLY on the provided text
+- Answers should be concise but complete (2-4 sentences)
+- Each question must be answerable from the text
+
+RESPONSE FORMAT (strict JSON array):
+[
+  {{
+    "question": "Question text here?",
+    "answer": "Concise but complete answer based on the text."
+  }}
+]
+
+TEXT:
+{text[:10000]}
+
+Return ONLY the JSON array, no extra text."""
+
+    raw = _chat(
+        messages=[{"role": "user", "content": prompt}],
+        model_hf=HF_TEXT_MODEL,
+        model_groq=GROQ_TEXT_MODEL,
+        temperature=0.4,
+        max_tokens=3000,
+    ).strip()
+
+    start = raw.find("[")
+    end = raw.rfind("]") + 1
+    if start != -1 and end > start:
+        raw = raw[start:end]
+
+    return json.loads(raw)
+
+
 # ── Q&A (Chat) ────────────────────────────────────────────────────────────────
 
 def answer_question(question: str, context_chunks: list[str]) -> str:
     context = "\n\n---\n\n".join(context_chunks)
 
     prompt = f"""You are a helpful assistant answering questions about a document.
+
+Based on the context below, identify the document type (educational, technical, business, creative/literary, news, or general) and tailor your answer accordingly:
+
+- **Educational** → explain concepts clearly with examples, focus on understanding
+- **Technical** → be precise, reference specific procedures, specifications, or configurations
+- **Business** → focus on strategy, data, market implications, and decision points
+- **Creative/Literary** → discuss themes, characters, plot, and narrative techniques
+- **News** → provide context, chronology, key facts, and stakeholder implications
+- **General** → clear, direct answers focused on the main information
 
 Use ONLY the provided context to answer. If the answer is not in the context, say:
 "I couldn't find this information in the document."

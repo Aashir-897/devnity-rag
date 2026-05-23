@@ -492,6 +492,44 @@
     font-size: 13px;
     color: var(--muted);
     line-height: 1.6;
+  }
+
+  .qa-controls {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .qa-count {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    width: 80px;
+  }
+
+  .qa-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 14px;
+  }
+
+  .qa-question {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent2);
+    margin-bottom: 8px;
+    line-height: 1.5;
+  }
+
+  .qa-answer {
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text);
+  }
     border-left: 3px solid var(--accent);
   }
 
@@ -781,6 +819,22 @@
     <div class="panel">
       <div class="panel-header">
         <div class="panel-title">
+          &#x1F4DD; Q&A Pairs
+          <span class="panel-tag">Auto Generated</span>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="qa-controls">
+          <input type="number" class="qa-count" id="qaCount" value="5" min="1" max="15">
+          <button class="btn btn-primary" id="qaBtn" onclick="generateQA()">Generate Q&A</button>
+        </div>
+        <div id="qaContainer"><div class="empty-state">Click "Generate Q&A" to start</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
           &#x1F4AC; Chat with PDF
           <span class="panel-tag">RAG Powered</span>
         </div>
@@ -1057,6 +1111,52 @@ function selectAnswer(qi, selected, correct, explanation) {
     badge.textContent = `Score: ${mcqCorrect}/${mcqTotal}`;
     badge.style.display = 'block';
   }
+}
+
+
+// ── Q&A Pairs ──
+async function generateQA() {
+  if (!currentPdfId) return;
+
+  const n   = parseInt(document.getElementById('qaCount').value) || 5;
+  const btn = document.getElementById('qaBtn');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Generating...';
+  document.getElementById('qaContainer').innerHTML = '<div class="empty-state"><span class="spinner"></span>Creating Q&A pairs...</div>';
+
+  try {
+    const res  = await fetch('/qa', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pdf_id: currentPdfId, num_pairs: n })
+    });
+    const data = await res.json();
+
+    if (!res.ok) { alert('Error: ' + data.error); return; }
+
+    renderQA(data.qa_pairs);
+  } catch (err) {
+    alert('Error: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Generate Q&A';
+  }
+}
+
+function renderQA(pairs) {
+  const container = document.getElementById('qaContainer');
+  container.innerHTML = '';
+
+  pairs.forEach((pair, i) => {
+    const card = document.createElement('div');
+    card.className = 'qa-card';
+    card.innerHTML = `
+      <div class="qa-question">Q${i + 1}. ${pair.question}</div>
+      <div class="qa-answer">${pair.answer}</div>
+    `;
+    container.appendChild(card);
+  });
 }
 
 
