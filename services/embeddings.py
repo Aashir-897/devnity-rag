@@ -1,4 +1,6 @@
 """Sentence-transformers embeddings + ChromaDB storage/retrieval."""
+import json
+import re
 import chromadb
 from sentence_transformers import SentenceTransformer
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -33,6 +35,28 @@ def get_collection():
             metadata={"hnsw:space": "cosine"}
         )
     return _collection
+
+
+# ── Text Chunking ─────────────────────────────────────────────────────────────
+
+# ── Page/Line Parsing ─────────────────────────────────────────────────────────
+
+_PAGE_LINE_RE = re.compile(r'\[Page (\d+)(?:, Line (\d+))?\]')
+
+
+def _extract_page_lines(text: str) -> dict:
+    """Extract page numbers and line numbers from [Page N, Line M] markers."""
+    pages = set()
+    lines = []
+    for match in _PAGE_LINE_RE.finditer(text):
+        page = int(match.group(1))
+        pages.add(page)
+        if match.group(2):
+            lines.append({"page": page, "line": int(match.group(2))})
+    return {
+        "pages": sorted(pages),
+        "lines": sorted(lines, key=lambda x: (x["page"], x["line"]))
+    }
 
 
 # ── Text Chunking ─────────────────────────────────────────────────────────────
@@ -72,7 +96,13 @@ def store_chunks(chunks: list[str], pdf_id: str, metadata_base: dict = None):
     metadatas = []
 
     for i, chunk in enumerate(chunks):
-        meta = {"pdf_id": pdf_id, "chunk_index": i}
+        info = _extract_page_lines(chunk)
+        meta = {
+            "pdf_id": pdf_id,
+            "chunk_index": i,
+            "pages": ",".join(str(p) for p in info["pages"]),
+            "lines": json.dumps(info["lines"]),
+        }
         if metadata_base:
             meta.update(metadata_base)
         metadatas.append(meta)
@@ -106,6 +136,39 @@ def retrieve_chunks(query: str, pdf_id: str, top_k: int = 5) -> list[str]:
     if results and results["documents"]:
         return results["documents"][0]
     return []
+
+
+def retrieve_chunks_with_sources(query: str, pdf_id: str, top_k: int = 5) -> list[dict]:
+    """Retrieve chunks with page/line metadata."""
+    model      = get_embedding_model()
+    collection = get_collection()
+
+    query_embedding = model.encode([query])[0].tolist()
+
+    results = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=top_k,
+        where={"pdf_id": pdf_id}
+    )
+
+    if not results or not results["documents"]:
+        return []
+
+    items = []
+    metadatas = results["metadatas"][0] if results.get("metadatas") else [{}] * len(results["documents"][0])
+
+    for i, doc in enumerate(results["documents"][0]):
+        meta = metadatas[i] if i < len(metadatas) else {}
+        pages_str = meta.get("pages", "")
+        lines_str = meta.get("lines", "[]")
+        items.append({
+            "text": doc,
+            "pages": [int(p) for p in pages_str.split(",") if p.strip().isdigit()] if pages_str else [],
+            "lines": json.loads(lines_str) if isinstance(lines_str, str) else lines_str,
+            "chunk_index": int(meta.get("chunk_index", 0)),
+        })
+
+    return items
 
 
 # ── Delete ────────────────────────────────────────────────────────────────────

@@ -24,6 +24,7 @@ CHROMA_COLLECTION = "pdf_chunks"
 BASE_DIR       = os.path.dirname(__file__)
 TEMP_DIR       = os.path.join(BASE_DIR, "storage", "temp")
 IMAGES_DIR     = os.path.join(BASE_DIR, "storage", "images")
+PDFS_DIR       = os.path.join(BASE_DIR, "storage", "pdfs")
 
 # ── PDF Processing ────────────────────────────────────
 MAX_PDF_SIZE_MB      = 30

@@ -674,7 +674,102 @@
   }
 
   .cancel-btn:hover { background: rgba(255,255,255,.05); color: var(--text); }
+
+  /* ── Split Layout ── */
+  .app-layout {
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+
+  .pdf-viewer-panel {
+    flex: 0 0 42%; position: sticky; top: 16px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden;
+    max-height: calc(100vh - 32px);
+  }
+
+  .pdf-viewer-header {
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 13px; font-weight: 700;
+  }
+
+  .viewer-toggle {
+    background: none; border: none; color: var(--muted);
+    cursor: pointer; font-size: 14px; padding: 4px 8px; border-radius: 4px;
+  }
+  .viewer-toggle:hover { background: rgba(255,255,255,.05); color: var(--text); }
+
+  .pdf-viewer-body {
+    overflow-y: auto; max-height: calc(100vh - 100px);
+    padding: 8px; display: flex; flex-direction: column; align-items: center;
+  }
+
+  .content-panels {
+    flex: 1; min-width: 0;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+
+  .pdf-page-wrapper {
+    position: relative; margin-bottom: 8px; border-radius: 4px; overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,.2);
+  }
+
+  .pdf-page-canvas { display: block; }
+
+  .highlight-overlay {
+    position: absolute; background: rgba(255, 230, 0, 0.35);
+    border-radius: 2px; pointer-events: none;
+    animation: highlight-fade 2.5s ease-out forwards;
+  }
+
+  @keyframes highlight-fade {
+    0%   { opacity: 1; }
+    70%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* ── Source References ── */
+  .source-box {
+    margin-top: 10px; padding: 10px 12px;
+    background: rgba(124,106,247,.06);
+    border: 1px solid rgba(124,106,247,.15);
+    border-radius: 8px; font-size: 12px;
+  }
+
+  .source-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: rgba(124,106,247,.12); color: var(--accent);
+    padding: 2px 8px; border-radius: 4px; font-size: 11px;
+    cursor: pointer; font-weight: 600; margin-bottom: 6px;
+    transition: background .15s;
+  }
+  .source-badge:hover { background: rgba(124,106,247,.25); }
+
+  .source-text {
+    color: var(--muted); line-height: 1.5; font-style: italic;
+    word-break: break-word;
+  }
+
+  .citation-link {
+    color: var(--accent2); cursor: pointer; font-weight: 600;
+    text-decoration: underline; text-decoration-style: dotted;
+  }
+  .citation-link:hover { color: var(--accent); }
+
+  .chat-source-box {
+    margin-top: 8px; padding: 8px 10px;
+    background: rgba(124,106,247,.04);
+    border: 1px solid var(--border); border-radius: 6px;
+    font-size: 11px; line-height: 1.5;
+  }
+
+  .chat-source-label {
+    color: var(--muted); font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px;
+  }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js">
+</script>
 </head>
 <body>
 <div class="container">
@@ -784,8 +879,22 @@
     </div>
   </div>
 
-  <!-- Panels -->
-  <div class="panels" id="panels">
+  <!-- Split Layout -->
+  <div class="app-layout" id="appLayout" style="display:none">
+
+    <!-- PDF Viewer -->
+    <div class="pdf-viewer-panel" id="pdfViewerPanel">
+      <div class="pdf-viewer-header">
+        <span>&#x1F4C4; Document Viewer</span>
+        <button class="viewer-toggle" onclick="toggleViewer()">&#x2716;</button>
+      </div>
+      <div class="pdf-viewer-body" id="pdfViewerBody">
+        <div id="pdfPages"></div>
+      </div>
+    </div>
+
+    <!-- Content Panels -->
+    <div class="content-panels" id="contentPanels">
 
     <div class="panel">
       <div class="panel-header">
@@ -851,7 +960,8 @@
       </div>
     </div>
 
-  </div><!-- /panels -->
+    </div><!-- /content-panels -->
+  </div><!-- /app-layout -->
 
 </div><!-- /container -->
 
@@ -861,6 +971,12 @@ let mcqAnswered  = 0;
 let mcqCorrect   = 0;
 let mcqTotal     = 0;
 let eventSource  = null;
+
+let pdfViewer    = null;
+let pdfScale     = 1.5;
+let linesData    = {};
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 const STEP_ORDER = ['Extracting', 'OCR', 'Images', 'Embeddings', 'Summary', 'Done'];
 
@@ -1022,13 +1138,20 @@ function showResults(data) {
   // Summary
   document.getElementById('summaryText').textContent = data.summary;
 
-  // Show panels with animation
-  const panels = document.getElementById('panels');
-  panels.classList.add('visible');
-  panels.querySelectorAll('.panel').forEach((p, i) => {
+  // Show app layout with animation
+  const layout = document.getElementById('appLayout');
+  layout.style.display = 'flex';
+  layout.querySelectorAll('.panel').forEach((p, i) => {
     p.style.animationDelay = (i * 0.1) + 's';
     p.classList.add('animation-slide-in');
   });
+
+  // Load PDF viewer
+  loadPDF(`/pdf/${data.pdf_id}/file`);
+  fetch(`/pdf/${data.pdf_id}/lines`)
+    .then(r => r.json())
+    .then(d => { linesData = d; })
+    .catch(() => {});
 }
 
 
@@ -1081,10 +1204,19 @@ function renderMCQs(mcqs) {
       </div>
     `).join('');
 
+    const sourceHtml = mcq.source ? `
+      <div class="source-box">
+        <span class="source-badge" onclick="highlightLine(${mcq.page || 1}, ${mcq.line || 1})">
+          &#x1F4D1; Page ${mcq.page || '?'}${mcq.line ? ', Line ' + mcq.line : ''}
+        </span>
+        <div class="source-text">"${mcq.source}"</div>
+      </div>` : '';
+
     card.innerHTML = `
       <div class="mcq-question">Q${qi + 1}. ${mcq.question}</div>
       <div class="mcq-options">${opts}</div>
       <div class="mcq-explanation" id="exp-${qi}">&#x1F4A1; ${mcq.explanation}</div>
+      ${sourceHtml}
     `;
     container.appendChild(card);
   });
@@ -1151,9 +1283,19 @@ function renderQA(pairs) {
   pairs.forEach((pair, i) => {
     const card = document.createElement('div');
     card.className = 'qa-card';
+
+    const sourceHtml = pair.source ? `
+      <div class="source-box">
+        <span class="source-badge" onclick="highlightLine(${pair.page || 1}, ${pair.line || 1})">
+          &#x1F4D1; Page ${pair.page || '?'}${pair.line ? ', Line ' + pair.line : ''}
+        </span>
+        <div class="source-text">"${pair.source}"</div>
+      </div>` : '';
+
     card.innerHTML = `
       <div class="qa-question">Q${i + 1}. ${pair.question}</div>
       <div class="qa-answer">${pair.answer}</div>
+      ${sourceHtml}
     `;
     container.appendChild(card);
   });
@@ -1161,6 +1303,12 @@ function renderQA(pairs) {
 
 
 // ── Chat ──
+function renderChatAnswer(text) {
+  // Convert [Page N, Line M] citations into clickable links
+  return text.replace(/\[Page (\d+), Line (\d+)\]/g,
+    '<a class="citation-link" onclick="highlightLine($1, $2)">[Page $1, Line $2]</a>');
+}
+
 async function sendChat() {
   const input = document.getElementById('chatInput');
   const q = input.value.trim();
@@ -1193,13 +1341,112 @@ async function sendChat() {
     });
     const data = await res.json();
 
-    aiMsg.innerHTML = `<div class="msg-label">PDF AI</div>${data.answer || data.error}`;
+    let html = '<div class="msg-label">PDF AI</div>';
+    html += renderChatAnswer(data.answer || data.error);
+
+    // Source chunks from retrieval
+    if (data.sources && data.sources.length) {
+      html += '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">';
+      data.sources.forEach((s, i) => {
+        const pages = s.pages && s.pages.length ? s.pages.join(', ') : '?';
+        const lines = s.lines && s.lines.length
+          ? `Line ${s.lines[0].line}${s.lines.length > 1 ? '-' + s.lines[s.lines.length-1].line : ''}`
+          : '';
+        html += `<div class="chat-source-box">
+          <div class="chat-source-label">&#x1F4D1; Source ${i+1} &middot; Page ${pages}${lines ? ' &middot; ' + lines : ''}</div>
+          <div style="color:var(--muted);font-style:italic">"${s.text.substring(0, 200)}${s.text.length > 200 ? '...' : ''}"</div>
+        </div>`;
+      });
+      html += '</div>';
+    }
+
+    aiMsg.innerHTML = html;
   } catch (err) {
     aiMsg.innerHTML = `<div class="msg-label">PDF AI</div>Error: ${err.message}`;
   } finally {
     document.getElementById('chatBtn').disabled = false;
     msgs.scrollTop = msgs.scrollHeight;
   }
+}
+
+
+// ── PDF Viewer ──
+function toggleViewer() {
+  const panel = document.getElementById('pdfViewerPanel');
+  const btn   = panel.querySelector('.viewer-toggle');
+  if (panel.style.display === 'none') {
+    panel.style.display = 'block';
+    btn.textContent = '\u2716';
+  } else {
+    panel.style.display = 'none';
+    btn.textContent = '\u25A9';
+  }
+}
+
+async function loadPDF(url) {
+  try {
+    pdfViewer = await pdfjsLib.getDocument(url).promise;
+    const container = document.getElementById('pdfPages');
+    container.innerHTML = '';
+    for (let i = 1; i <= pdfViewer.numPages; i++) {
+      await renderPage(i, container);
+    }
+    document.getElementById('pdfViewerPanel').style.display = 'block';
+  } catch (e) {
+    console.error('PDF load error:', e);
+  }
+}
+
+async function renderPage(num, container) {
+  const page = await pdfViewer.getPage(num);
+  const viewport = page.getViewport({scale: pdfScale});
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'pdf-page-wrapper';
+  wrapper.id = `pdf-page-${num}`;
+  wrapper.style.width = viewport.width + 'px';
+  wrapper.style.height = viewport.height + 'px';
+
+  const canvas = document.createElement('canvas');
+  canvas.className = 'pdf-page-canvas';
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  wrapper.appendChild(canvas);
+
+  container.appendChild(wrapper);
+
+  await page.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
+}
+
+async function highlightLine(pageNum, lineNum) {
+  const wrapper = document.getElementById(`pdf-page-${pageNum}`);
+  if (!wrapper) return;
+
+  // Remove old highlights
+  wrapper.querySelectorAll('.highlight-overlay').forEach(el => el.remove());
+
+  // Scroll viewer to this page
+  document.getElementById('pdfViewerBody').scrollTo({
+    top: wrapper.offsetTop - 16,
+    behavior: 'smooth'
+  });
+
+  // Get line bbox from pre-loaded linesData
+  const pageData = linesData[pageNum] || [];
+  const lineData = pageData.find(l => l.line === lineNum);
+  if (!lineData || !lineData.bbox) return;
+
+  const [x0, y0, x1, y1] = lineData.bbox;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'highlight-overlay';
+  overlay.style.left = (x0 * pdfScale) + 'px';
+  overlay.style.top = (y0 * pdfScale) + 'px';
+  overlay.style.width = ((x1 - x0) * pdfScale) + 'px';
+  overlay.style.height = ((y1 - y0) * pdfScale) + 'px';
+  wrapper.appendChild(overlay);
+
+  setTimeout(() => overlay.remove(), 2500);
 }
 </script>
 </body>

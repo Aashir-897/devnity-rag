@@ -3,15 +3,16 @@ import os
 import json
 import uuid
 import time
+import shutil
 import threading
-from flask import Flask, request, jsonify, render_template, Response
+from flask import Flask, request, jsonify, render_template, Response, send_from_directory
 from flask_cors import CORS
 
-from config import TEMP_DIR, IMAGES_DIR, PORT, HOST, DEBUG
+from config import TEMP_DIR, IMAGES_DIR, PDFS_DIR, PORT, HOST, DEBUG
 from services.pdf_processor import process_pdf, is_text_empty
 from services.ocr_service   import run_ocr_on_pdf_page
 from services.image_service import process_pdf_images, cleanup_images
-from services.embeddings    import chunk_text, store_chunks, retrieve_chunks, delete_pdf_chunks
+from services.embeddings    import chunk_text, store_chunks, delete_pdf_chunks, retrieve_chunks_with_sources
 from services.groq_service  import generate_summary, generate_mcqs, generate_qa_pairs, answer_question
 
 
@@ -43,9 +44,10 @@ def _process_pdf_background(pdf_path, filename, pdf_id):
         print(f"\nProcessing PDF: {filename} (id: {pdf_id})")
 
         _update_status(pdf_id, "Extracting", 10, "Step 1: Extracting text and images...")
-        result  = process_pdf(pdf_path)
-        pages   = result["pages"]
+        result    = process_pdf(pdf_path)
+        pages     = result["pages"]
         full_text = result["full_text"]
+        lines_data = result.get("lines_data", {})
 
         _update_status(pdf_id, "OCR", 20, "Step 2: Checking for scanned pages...")
         all_text_parts = [full_text] if full_text else []
@@ -80,6 +82,11 @@ def _process_pdf_background(pdf_path, filename, pdf_id):
         _update_status(pdf_id, "Summary", 80, "Step 5: Generating summary...")
         summary = generate_summary(combined_text)
 
+        # Save PDF permanently for viewer
+        os.makedirs(PDFS_DIR, exist_ok=True)
+        pdf_dest = os.path.join(PDFS_DIR, f"{pdf_id}.pdf")
+        shutil.copy2(pdf_path, pdf_dest)
+
         _update_status(pdf_id, "Cleanup", 95, "Cleaning up...")
         all_image_paths = [img["image_path"] for img in image_results]
         cleanup_images(all_image_paths)
@@ -88,7 +95,9 @@ def _process_pdf_background(pdf_path, filename, pdf_id):
 
         pdf_store[pdf_id] = {
             "filename": filename,
+            "pdf_path": pdf_dest,
             "full_text": combined_text,
+            "lines_data": lines_data,
             "summary": summary,
             "num_chunks": num_chunks,
             "total_pages": result["total_pages"],
@@ -202,18 +211,49 @@ def chat():
     if not question:
         return jsonify({"error": "Question is required"}), 400
 
-    chunks = retrieve_chunks(question, pdf_id, top_k=5)
+    sources = retrieve_chunks_with_sources(question, pdf_id, top_k=5)
 
-    if not chunks:
+    if not sources:
         return jsonify({"answer": "I couldn't find relevant information in this document."})
 
-    answer = answer_question(question, chunks)
+    chunks_text = [s["text"] for s in sources]
+    answer = answer_question(question, chunks_text)
+
+    # Attach page/line info from each source chunk
+    chat_sources = []
+    for s in sources:
+        chat_sources.append({
+            "text": s["text"],
+            "pages": s.get("pages", []),
+            "lines": s.get("lines", []),
+            "chunk_index": s.get("chunk_index", 0),
+        })
 
     return jsonify({
         "pdf_id": pdf_id,
         "question": question,
-        "answer": answer
+        "answer": answer,
+        "sources": chat_sources
     })
+
+
+@app.route("/pdf/<pdf_id>/file")
+def serve_pdf(pdf_id):
+    """Serve the original PDF file for the viewer."""
+    if pdf_id not in pdf_store:
+        return jsonify({"error": "PDF not found"}), 404
+    pdf_path = pdf_store[pdf_id].get("pdf_path")
+    if not pdf_path or not os.path.exists(pdf_path):
+        return jsonify({"error": "PDF file not available"}), 404
+    return send_from_directory(os.path.dirname(pdf_path), os.path.basename(pdf_path))
+
+
+@app.route("/pdf/<pdf_id>/lines")
+def serve_pdf_lines(pdf_id):
+    """Serve line-level metadata for highlighting."""
+    if pdf_id not in pdf_store:
+        return jsonify({"error": "PDF not found"}), 404
+    return jsonify(pdf_store[pdf_id].get("lines_data", {}))
 
 
 @app.route("/pdf/<pdf_id>", methods=["DELETE"])
@@ -221,6 +261,14 @@ def delete_pdf(pdf_id):
     """Delete a PDF and its chunks."""
     if pdf_id not in pdf_store:
         return jsonify({"error": "PDF not found"}), 404
+
+    # Clean up saved PDF
+    pdf_path = pdf_store[pdf_id].get("pdf_path")
+    if pdf_path and os.path.exists(pdf_path):
+        try:
+            os.remove(pdf_path)
+        except Exception:
+            pass
 
     delete_pdf_chunks(pdf_id)
     del pdf_store[pdf_id]
@@ -239,6 +287,7 @@ if __name__ == "__main__":
     # Ensure directories exist
     os.makedirs(TEMP_DIR, exist_ok=True)
     os.makedirs(IMAGES_DIR, exist_ok=True)
+    os.makedirs(PDFS_DIR, exist_ok=True)
 
     # Cleanup stale temp files on startup
     for d in (TEMP_DIR, IMAGES_DIR):

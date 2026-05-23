@@ -8,15 +8,23 @@ from config import TEMP_DIR, IMAGES_DIR, MIN_IMAGE_WIDTH, MIN_IMAGE_HEIGHT
 # ── Main Entry Point ──────────────────────────────────────────────────────────
 
 def process_pdf(pdf_path: str) -> dict:
-    """Extract text and images from a PDF."""
+    """Extract text and images from a PDF, with line-level metadata."""
     doc = fitz.open(pdf_path)
     pages = []
     full_text_parts = []
+    all_lines = {}  # page_num -> [{line, text, bbox}]
 
     for page_num, page in enumerate(doc, start=1):
-        # 1. Text extract
-        raw_text = page.get_text("text")
+        # 1. Text extract with lines
+        page_lines = _extract_lines(page, page_num)
+        all_lines[page_num] = page_lines
+
+        raw_text = "\n".join(l["text"] for l in page_lines)
         clean = clean_text(raw_text)
+        line_marker_text = "\n".join(
+            f"[Page {page_num}, Line {l['line']}] {l['text']}"
+            for l in page_lines
+        )
 
         # 2. Images extract
         image_paths = extract_images_from_page(doc, page, page_num)
@@ -24,19 +32,44 @@ def process_pdf(pdf_path: str) -> dict:
         pages.append({
             "page_num": page_num,
             "text": clean,
-            "images": image_paths
+            "images": image_paths,
+            "lines": page_lines
         })
 
         if clean:
-            full_text_parts.append(f"[Page {page_num}]\n{clean}")
+            full_text_parts.append(line_marker_text)
 
     doc.close()
 
     return {
         "pages": pages,
         "full_text": "\n\n".join(full_text_parts),
-        "total_pages": len(pages)
+        "total_pages": len(pages),
+        "lines_data": all_lines
     }
+
+
+def _extract_lines(page, page_num: int) -> list[dict]:
+    """Extract text lines with bounding boxes from a page."""
+    lines = []
+    raw_dict = page.get_text("dict")
+    line_counter = 0
+
+    for block in raw_dict.get("blocks", []):
+        if block.get("type") != 0:  # skip image blocks
+            continue
+        for line in block.get("lines", []):
+            line_counter += 1
+            bbox = line["bbox"]
+            text = "".join(span["text"] for span in line["spans"])
+            if text.strip():
+                lines.append({
+                    "line": line_counter,
+                    "text": text.strip(),
+                    "bbox": [round(b, 2) for b in bbox],
+                })
+
+    return lines
 
 
 # ── Image Extraction ──────────────────────────────────────────────────────────

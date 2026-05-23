@@ -14,7 +14,7 @@ venv/
 
 # Runtime data
 storage/temp/
-storage/images/
+storage/
 vector_db/
 
 # IDE
@@ -28,6 +28,7 @@ Thumbs.db
 
 test.py     
 error.txt
+feature.txt
 
 AGENTS.md
 setup.txt

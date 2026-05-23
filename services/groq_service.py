@@ -102,6 +102,11 @@ RULES for ALL types:
 - Only one correct answer per question
 - Include a brief explanation for the correct answer
 
+IMPORTANT: For each question, include the exact source reference:
+- "source": A short verbatim excerpt from the text that supports this question
+- "page": The page number where the source appears (from [Page N, Line M] markers)
+- "line": The line number where the source appears (from [Page N, Line M] markers)
+
 RESPONSE FORMAT (strict JSON array):
 [
   {{
@@ -113,7 +118,10 @@ RESPONSE FORMAT (strict JSON array):
       "D": "Option D"
     }},
     "answer": "A",
-    "explanation": "Brief explanation why A is correct"
+    "explanation": "Brief explanation why A is correct",
+    "source": "Verbatim excerpt supporting this question",
+    "page": 3,
+    "line": 12
   }}
 ]
 
@@ -160,11 +168,19 @@ RULES:
 - Answers should be concise but complete (2-4 sentences)
 - Each question must be answerable from the text
 
+IMPORTANT: For each pair, include the exact source reference:
+- "source": A short verbatim excerpt from the text that supports this Q&A
+- "page": The page number where the source appears (from [Page N, Line M] markers)
+- "line": The line number where the source appears (from [Page N, Line M] markers)
+
 RESPONSE FORMAT (strict JSON array):
 [
   {{
     "question": "Question text here?",
-    "answer": "Concise but complete answer based on the text."
+    "answer": "Concise but complete answer based on the text.",
+    "source": "Verbatim excerpt supporting this Q&A",
+    "page": 3,
+    "line": 12
   }}
 ]
 
@@ -205,6 +221,8 @@ Based on the context below, identify the document type (educational, technical, 
 - **News** → provide context, chronology, key facts, and stakeholder implications
 - **General** → clear, direct answers focused on the main information
 
+IMPORTANT: The context contains [Page N, Line M] markers. When you use information from the context, cite the source by including the page and line reference in your answer like this: [Page 3, Line 12]. Always attach a citation to each piece of information you use.
+
 Use ONLY the provided context to answer. If the answer is not in the context, say:
 "I couldn't find this information in the document."
 
@@ -213,7 +231,7 @@ CONTEXT:
 
 QUESTION: {question}
 
-Provide a clear, accurate answer based on the context above."""
+Provide a clear, accurate answer based on the context above, with citations."""
 
     return _chat(
         messages=[{"role": "user", "content": prompt}],
