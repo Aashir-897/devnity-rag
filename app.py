@@ -1,131 +1,177 @@
-"""Flask app — PDF upload, RAG chat, MCQ generation."""
+"""Flask app — PDF upload, RAG chat, MCQ generation, auth."""
 import os
 import json
 import uuid
 import time
 import shutil
 import threading
-from flask import Flask, request, jsonify, render_template, Response, send_from_directory
+from flask import Flask, request, jsonify, render_template, Response, send_from_directory, redirect
 from flask_cors import CORS
+from flask_login import LoginManager, login_required, login_user, current_user
 
-from config import TEMP_DIR, IMAGES_DIR, PDFS_DIR, PORT, HOST, DEBUG
+from config import TEMP_DIR, IMAGES_DIR, PDFS_DIR, PORT, HOST, DEBUG, DATABASE_URL, SESSION_SECRET
+from models import db, User
+from routes.auth import auth_bp
 from services.pdf_processor import process_pdf, is_text_empty
 from services.ocr_service   import run_ocr_on_pdf_page
 from services.image_service import process_pdf_images, cleanup_images
-from services.embeddings    import chunk_text, store_chunks, delete_pdf_chunks, retrieve_chunks_with_sources
-from services.groq_service  import generate_summary, generate_mcqs, generate_qa_pairs, answer_question
+from services.embeddings     import chunk_text
+from services.vector_service import store_chunks, retrieve_chunks, delete_pdf_chunks
+from services.groq_service   import generate_summary, generate_mcqs, generate_qa_pairs, answer_question
+from services import storage_service
 
 
 app = Flask(__name__)
-CORS(app)
+app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SECRET_KEY"] = SESSION_SECRET
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["REMEMBER_COOKIE_HTTPONLY"] = True
 
-pdf_store = {}  # pdf_id -> {filename, summary, status}
-_processing_status = {}  # pdf_id -> {step, progress, message, done, error, result}
+CORS(app, supports_credentials=True)
+db.init_app(app)
+
+login_manager = LoginManager()
+login_manager.login_view = "auth.login"
+login_manager.init_app(app)
+
+
+@login_manager.user_loader
+def load_user(user_id: str):
+    return db.session.get(User, int(user_id))
+
+
+with app.app_context():
+    from models import User, Document  # noqa
+    db.create_all()
+
+app.register_blueprint(auth_bp)
+
+_processing_status = {}  # {user_id}:{pdf_id} -> {step, progress, message, done, error, result}
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.route("/")
+@login_required
 def index():
-    return render_template("index.html")
+    docs = Document.query.filter_by(user_id=current_user.id, status="ready")\
+        .order_by(Document.created_at.desc()).all()
+    return render_template("index.html", documents=docs)
 
 
-def _update_status(pdf_id, step, progress, message="", done=False, error=False, result=None):
-    _processing_status[pdf_id] = {
+def _status_key(user_id, pdf_id):
+    return f"{user_id}:{pdf_id}"
+
+
+def _update_status(user_id, pdf_id, step, progress, message="", done=False, error=False, result=None):
+    key = _status_key(user_id, pdf_id)
+    _processing_status[key] = {
         "step": step, "progress": progress, "message": message,
         "done": done, "error": error, "result": result,
     }
 
 
-def _process_pdf_background(pdf_path, filename, pdf_id):
+def _process_pdf_background(pdf_path, filename, pdf_id, user_id):
     """Run PDF processing in a background thread, updating SSE progress."""
-    try:
-        _update_status(pdf_id, "Extracting", 5, "Extracting text and images from PDF...")
-        print(f"\nProcessing PDF: {filename} (id: {pdf_id})")
+    with app.app_context():
+        try:
+            _update_status(user_id, pdf_id, "Extracting", 5, "Extracting text and images from PDF...")
+            print(f"\nProcessing PDF: {filename} (id: {pdf_id}, user: {user_id})")
 
-        _update_status(pdf_id, "Extracting", 10, "Step 1: Extracting text and images...")
-        result    = process_pdf(pdf_path)
-        pages     = result["pages"]
-        full_text = result["full_text"]
-        lines_data = result.get("lines_data", {})
+            _update_status(user_id, pdf_id, "Extracting", 10, "Step 1: Extracting text and images...")
+            result    = process_pdf(pdf_path)
+            pages     = result["pages"]
+            full_text = result["full_text"]
+            lines_data = result.get("lines_data", {})
 
-        _update_status(pdf_id, "OCR", 20, "Step 2: Checking for scanned pages...")
-        all_text_parts = [full_text] if full_text else []
-        total_pages = len(pages)
-        scanned_pages = 0
+            _update_status(user_id, pdf_id, "OCR", 20, "Step 2: Checking for scanned pages...")
+            all_text_parts = [full_text] if full_text else []
+            total_pages = len(pages)
+            scanned_pages = 0
 
-        for page in pages:
-            if is_text_empty(page["text"]):
-                scanned_pages += 1
-                pct = 20 + int((scanned_pages / max(total_pages, 1)) * 15)
-                _update_status(pdf_id, "OCR", pct, f"Running OCR on page {page['page_num']}...")
-                ocr_text = run_ocr_on_pdf_page(pdf_path, page["page_num"])
-                if ocr_text:
-                    page["text"] = ocr_text
-                    all_text_parts.append(f"[Page {page['page_num']}]\n{ocr_text}")
+            for page in pages:
+                if is_text_empty(page["text"]):
+                    scanned_pages += 1
+                    pct = 20 + int((scanned_pages / max(total_pages, 1)) * 15)
+                    _update_status(user_id, pdf_id, "OCR", pct, f"Running OCR on page {page['page_num']}...")
+                    ocr_text = run_ocr_on_pdf_page(pdf_path, page["page_num"])
+                    if ocr_text:
+                        page["text"] = ocr_text
+                        all_text_parts.append(f"[Page {page['page_num']}]\n{ocr_text}")
 
-        _update_status(pdf_id, "Images", 35, "Step 3: Processing images...")
-        image_results = process_pdf_images(pages)
-        for img_result in image_results:
-            all_text_parts.append(img_result["description"])
+            _update_status(user_id, pdf_id, "Images", 35, "Step 3: Processing images...")
+            image_results = process_pdf_images(pages)
+            for img_result in image_results:
+                all_text_parts.append(img_result["description"])
 
-        combined_text = "\n\n".join(all_text_parts)
+            combined_text = "\n\n".join(all_text_parts)
 
-        if not combined_text.strip():
-            _update_status(pdf_id, "Error", 0, "Could not extract text from PDF", error=True)
-            return
+            if not combined_text.strip():
+                _update_status(user_id, pdf_id, "Error", 0, "Could not extract text from PDF", error=True)
+                doc = db.session.get(Document, pdf_id)
+                if doc:
+                    doc.status = "error"
+                    doc.error_message = "Could not extract text from PDF"
+                    db.session.commit()
+                return
 
-        _update_status(pdf_id, "Embeddings", 55, "Step 4: Creating embeddings (this may take a minute)...")
-        chunks     = chunk_text(combined_text)
-        num_chunks = store_chunks(chunks, pdf_id)
+            _update_status(user_id, pdf_id, "Embeddings", 55, "Step 4: Creating embeddings (this may take a minute)...")
+            chunks     = chunk_text(combined_text)
+            num_chunks = store_chunks(chunks, pdf_id, user_id=user_id)
 
-        _update_status(pdf_id, "Summary", 80, "Step 5: Generating summary...")
-        summary = generate_summary(combined_text)
+            _update_status(user_id, pdf_id, "Summary", 80, "Step 5: Generating summary...")
+            summary = generate_summary(combined_text)
 
-        # Save PDF permanently for viewer
-        os.makedirs(PDFS_DIR, exist_ok=True)
-        pdf_dest = os.path.join(PDFS_DIR, f"{pdf_id}.pdf")
-        shutil.copy2(pdf_path, pdf_dest)
+            # Save PDF permanently for viewer
+            storage_key = storage_service.upload_file(pdf_path, pdf_id)
 
-        _update_status(pdf_id, "Cleanup", 95, "Cleaning up...")
-        all_image_paths = [img["image_path"] for img in image_results]
-        cleanup_images(all_image_paths)
-        if os.path.exists(pdf_path):
-            os.remove(pdf_path)
-
-        pdf_store[pdf_id] = {
-            "filename": filename,
-            "pdf_path": pdf_dest,
-            "full_text": combined_text,
-            "lines_data": lines_data,
-            "summary": summary,
-            "num_chunks": num_chunks,
-            "total_pages": result["total_pages"],
-            "status": "ready"
-        }
-
-        print(f"PDF processed successfully! Chunks: {num_chunks}")
-
-        _update_status(pdf_id, "Done", 100, "Ready!", done=True, result={
-            "pdf_id": pdf_id,
-            "filename": filename,
-            "total_pages": result["total_pages"],
-            "num_chunks": num_chunks,
-            "summary": summary,
-            "status": "ready"
-        })
-
-    except Exception as e:
-        print(f"Error: {e}")
-        _update_status(pdf_id, "Error", 0, str(e), error=True)
-        if os.path.exists(pdf_path):
-            try:
+            _update_status(user_id, pdf_id, "Cleanup", 95, "Cleaning up...")
+            all_image_paths = [img["image_path"] for img in image_results]
+            cleanup_images(all_image_paths)
+            if os.path.exists(pdf_path):
                 os.remove(pdf_path)
-            except Exception:
-                pass
+
+            # Update Document record in DB
+            doc = db.session.get(Document, pdf_id)
+            if doc:
+                doc.summary = summary
+                doc.full_text = combined_text
+                doc.lines_data = lines_data
+                doc.num_chunks = num_chunks
+                doc.total_pages = result["total_pages"]
+                doc.storage_key = storage_key
+                doc.status = "ready"
+                db.session.commit()
+
+            print(f"PDF processed successfully! Chunks: {num_chunks}")
+
+            _update_status(user_id, pdf_id, "Done", 100, "Ready!", done=True, result={
+                "pdf_id": pdf_id,
+                "filename": filename,
+                "total_pages": result["total_pages"],
+                "num_chunks": num_chunks,
+                "summary": summary,
+                "status": "ready"
+            })
+
+        except Exception as e:
+            print(f"Error: {e}")
+            _update_status(user_id, pdf_id, "Error", 0, str(e), error=True)
+            doc = db.session.get(Document, pdf_id)
+            if doc:
+                doc.status = "error"
+                doc.error_message = str(e)
+                db.session.commit()
+            if os.path.exists(pdf_path):
+                try:
+                    os.remove(pdf_path)
+                except Exception:
+                    pass
 
 
 @app.route("/upload", methods=["POST"])
+@login_required
 def upload_pdf():
     """Upload PDF and start background processing."""
 
@@ -141,9 +187,19 @@ def upload_pdf():
     pdf_path = os.path.join(TEMP_DIR, filename)
     file.save(pdf_path)
 
+    # Create Document record
+    doc = Document(
+        id=pdf_id,
+        user_id=current_user.id,
+        original_name=file.filename,
+        status="processing",
+    )
+    db.session.add(doc)
+    db.session.commit()
+
     thread = threading.Thread(
         target=_process_pdf_background,
-        args=(pdf_path, file.filename, pdf_id),
+        args=(pdf_path, file.filename, pdf_id, current_user.id),
         daemon=True,
     )
     thread.start()
@@ -152,66 +208,83 @@ def upload_pdf():
 
 
 @app.route("/progress/<pdf_id>")
+@login_required
 def progress_stream(pdf_id):
     """SSE endpoint — real-time processing progress."""
+    key = _status_key(current_user.id, pdf_id)
+
     def generate():
         while True:
-            status = _processing_status.get(pdf_id, {})
+            status = _processing_status.get(key, {})
             yield f"data: {json.dumps(status)}\n\n"
             if status.get("done") or status.get("error"):
-                if pdf_id in _processing_status:
-                    del _processing_status[pdf_id]
+                if key in _processing_status:
+                    del _processing_status[key]
                 break
             time.sleep(0.5)
     return Response(generate(), mimetype="text/event-stream")
 
 
+def _get_doc_or_404(pdf_id):
+    """Helper: fetch Document owned by current user or return 404."""
+    doc = Document.query.filter_by(id=pdf_id, user_id=current_user.id).first()
+    if not doc:
+        return None
+    return doc
+
+
 @app.route("/mcqs", methods=["POST"])
+@login_required
 def get_mcqs():
     """Generate MCQs from a processed PDF."""
     data = request.json
     pdf_id       = data.get("pdf_id")
     num_questions = data.get("num_questions", 5)
 
-    if pdf_id not in pdf_store:
+    doc = _get_doc_or_404(pdf_id)
+    if not doc:
         return jsonify({"error": "PDF not found"}), 404
 
-    text = pdf_store[pdf_id].get("full_text") or pdf_store[pdf_id]["summary"]
+    text = doc.full_text or doc.summary or ""
     mcqs = generate_mcqs(text, num_questions=num_questions)
 
     return jsonify({"pdf_id": pdf_id, "mcqs": mcqs})
 
 
 @app.route("/qa", methods=["POST"])
+@login_required
 def get_qa():
     """Generate Q&A pairs from a processed PDF."""
     data = request.json
     pdf_id    = data.get("pdf_id")
     num_pairs = data.get("num_pairs", 5)
 
-    if pdf_id not in pdf_store:
+    doc = _get_doc_or_404(pdf_id)
+    if not doc:
         return jsonify({"error": "PDF not found"}), 404
 
-    text = pdf_store[pdf_id].get("full_text") or pdf_store[pdf_id]["summary"]
+    text = doc.full_text or doc.summary or ""
     pairs = generate_qa_pairs(text, num_pairs=num_pairs)
 
     return jsonify({"pdf_id": pdf_id, "qa_pairs": pairs})
 
 
 @app.route("/chat", methods=["POST"])
+@login_required
 def chat():
     """Answer a question using retrieved PDF chunks."""
     data     = request.json
     pdf_id   = data.get("pdf_id")
     question = data.get("question", "").strip()
 
-    if not pdf_id or pdf_id not in pdf_store:
+    doc = _get_doc_or_404(pdf_id)
+    if not doc:
         return jsonify({"error": "PDF not found"}), 404
 
     if not question:
         return jsonify({"error": "Question is required"}), 400
 
-    sources = retrieve_chunks_with_sources(question, pdf_id, top_k=5)
+    sources = retrieve_chunks(question, pdf_id, user_id=current_user.id, top_k=5)
 
     if not sources:
         return jsonify({"answer": "I couldn't find relevant information in this document."})
@@ -219,7 +292,6 @@ def chat():
     chunks_text = [s["text"] for s in sources]
     answer = answer_question(question, chunks_text)
 
-    # Attach page/line info from each source chunk
     chat_sources = []
     for s in sources:
         chat_sources.append({
@@ -237,48 +309,72 @@ def chat():
     })
 
 
-@app.route("/pdf/<pdf_id>/file")
-def serve_pdf(pdf_id):
-    """Serve the original PDF file for the viewer."""
-    if pdf_id not in pdf_store:
+@app.route("/pdf/<pdf_id>/info")
+@login_required
+def pdf_info(pdf_id):
+    """Return document metadata for restoring state on existing doc selection."""
+    doc = _get_doc_or_404(pdf_id)
+    if not doc:
         return jsonify({"error": "PDF not found"}), 404
-    pdf_path = pdf_store[pdf_id].get("pdf_path")
-    if not pdf_path or not os.path.exists(pdf_path):
-        return jsonify({"error": "PDF file not available"}), 404
-    return send_from_directory(os.path.dirname(pdf_path), os.path.basename(pdf_path))
+    return jsonify({
+        "pdf_id": doc.id,
+        "filename": doc.original_name,
+        "total_pages": doc.total_pages,
+        "num_chunks": doc.num_chunks,
+        "summary": doc.summary or "",
+    })
+
+
+@app.route("/pdf/<pdf_id>/file")
+@login_required
+def serve_pdf(pdf_id):
+    """Serve the original PDF file for the viewer via presigned URL or local file."""
+    doc = _get_doc_or_404(pdf_id)
+    if not doc:
+        return jsonify({"error": "PDF not found"}), 404
+
+    url = storage_service.get_presigned_url(pdf_id)
+    if url:
+        return redirect(url)
+
+    local_path = storage_service.get_local_path(pdf_id)
+    if local_path and os.path.exists(local_path):
+        return send_from_directory(os.path.dirname(local_path), os.path.basename(local_path))
+
+    return jsonify({"error": "PDF file not available"}), 404
 
 
 @app.route("/pdf/<pdf_id>/lines")
+@login_required
 def serve_pdf_lines(pdf_id):
     """Serve line-level metadata for highlighting."""
-    if pdf_id not in pdf_store:
+    doc = _get_doc_or_404(pdf_id)
+    if not doc:
         return jsonify({"error": "PDF not found"}), 404
-    return jsonify(pdf_store[pdf_id].get("lines_data", {}))
+    return jsonify(doc.lines_data or {})
 
 
 @app.route("/pdf/<pdf_id>", methods=["DELETE"])
+@login_required
 def delete_pdf(pdf_id):
     """Delete a PDF and its chunks."""
-    if pdf_id not in pdf_store:
+    doc = _get_doc_or_404(pdf_id)
+    if not doc:
         return jsonify({"error": "PDF not found"}), 404
 
-    # Clean up saved PDF
-    pdf_path = pdf_store[pdf_id].get("pdf_path")
-    if pdf_path and os.path.exists(pdf_path):
-        try:
-            os.remove(pdf_path)
-        except Exception:
-            pass
+    storage_service.delete_file(pdf_id)
 
-    delete_pdf_chunks(pdf_id)
-    del pdf_store[pdf_id]
+    delete_pdf_chunks(pdf_id, user_id=current_user.id)
+    db.session.delete(doc)
+    db.session.commit()
 
     return jsonify({"message": "PDF deleted successfully"})
 
 
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok", "pdfs_loaded": len(pdf_store)})
+    doc_count = Document.query.count() if Document else 0
+    return jsonify({"status": "ok", "documents": doc_count})
 
 
 # ── Run ───────────────────────────────────────────────────────────────────────
@@ -289,14 +385,15 @@ if __name__ == "__main__":
     os.makedirs(IMAGES_DIR, exist_ok=True)
     os.makedirs(PDFS_DIR, exist_ok=True)
 
-    # Cleanup stale temp files on startup
-    for d in (TEMP_DIR, IMAGES_DIR):
-        for f in os.listdir(d):
-            fpath = os.path.join(d, f)
-            try:
-                if os.path.isfile(fpath):
-                    os.remove(fpath)
-            except Exception:
-                pass
+    # Cleanup stale temp files on startup (only on first start, not reload)
+    if os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+        for d in (TEMP_DIR, IMAGES_DIR):
+            for f in os.listdir(d):
+                fpath = os.path.join(d, f)
+                try:
+                    if os.path.isfile(fpath):
+                        os.remove(fpath)
+                except Exception:
+                    pass
 
     app.run(debug=DEBUG, host=HOST, port=PORT)

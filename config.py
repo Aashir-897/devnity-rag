@@ -16,9 +16,25 @@ GROQ_VISION_MODEL = os.getenv("GROQ_VISION_MODEL", "meta-llama/llama-4-scout-17b
 # ── Embeddings ────────────────────────────────────────
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-base-en-v1.5")
 
-# ── ChromaDB ──────────────────────────────────────────
+# ── Database ──────────────────────────────────────────
+DATABASE_URL   = os.getenv("DATABASE_URL", "")  # SQLite for dev, PostgreSQL for prod
+SESSION_SECRET = os.getenv("SESSION_SECRET", "")
+
+# ── Vector DB (legacy — ChromaDB, will be replaced) ──
 CHROMA_DB_PATH = os.path.join(os.path.dirname(__file__), "vector_db")
 CHROMA_COLLECTION = "pdf_chunks"
+
+# ── Qdrant ────────────────────────────────────────────
+QDRANT_URL        = os.getenv("QDRANT_URL", "http://localhost:6333")
+QDRANT_API_KEY    = os.getenv("QDRANT_API_KEY", "")
+QDRANT_COLLECTION = "pdf_chunks"
+
+# ── DigitalOcean Spaces ──────────────────────────────
+DO_SPACES_KEY      = os.getenv("DO_SPACES_KEY", "")
+DO_SPACES_SECRET   = os.getenv("DO_SPACES_SECRET", "")
+DO_SPACES_REGION   = os.getenv("DO_SPACES_REGION", "nyc3")
+DO_SPACES_BUCKET   = os.getenv("DO_SPACES_BUCKET", "rag-devnity")
+DO_SPACES_ENDPOINT = f"https://{DO_SPACES_REGION}.digitaloceanspaces.com"
 
 # ── Storage ───────────────────────────────────────────
 BASE_DIR       = os.path.dirname(__file__)
@@ -28,11 +44,11 @@ PDFS_DIR       = os.path.join(BASE_DIR, "storage", "pdfs")
 
 # ── PDF Processing ────────────────────────────────────
 MAX_PDF_SIZE_MB      = 30
-MIN_IMAGE_WIDTH      = 100   # pixels — smaller images are decorative
+MIN_IMAGE_WIDTH      = 100
 MIN_IMAGE_HEIGHT     = 100
-MAX_IMAGES_TOTAL     = 50    # max images to process (Vision API limit)
-MAX_IMAGES_PER_PAGE  = 5     # max images per page
-VISION_DELAY_SEC     = 1.5   # delay between Vision API calls (avoids 429)
+MAX_IMAGES_TOTAL     = 50
+MAX_IMAGES_PER_PAGE  = 5
+VISION_DELAY_SEC     = 1.5
 
 # ── Chunking ──────────────────────────────────────────
 CHUNK_SIZE    = 800

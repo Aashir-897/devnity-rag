@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF Intelligence System</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --border: #1e1e2e;
+    --accent: #7c6af7;
+    --accent2: #f7a26a;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --success: #4ade80;
+    --error: #f87171;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(124,106,247,.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,106,247,.04) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container { max-width: 960px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+  header {
+    padding: 24px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--text); }
+
+  .logo-icon {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+
+  .logo-text { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
+  .logo-sub { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; margin-top: 1px; }
+
+  .nav-links { display: flex; align-items: center; gap: 16px; }
+
+  .nav-link {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    transition: color .15s;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .nav-link:hover { color: var(--text); border-color: var(--accent); }
+
+  .user-badge {
+    font-size: 12px;
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    padding: 6px 12px;
+    border-radius: 8px;
+    background: rgba(124,106,247,.08);
+    border: 1px solid rgba(124,106,247,.15);
+  }
+
+  .flash-messages { margin-bottom: 16px; }
+
+  .flash-msg {
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .flash-msg.error { background: rgba(248,113,113,.1); border: 1px solid rgba(248,113,113,.2); color: var(--error); }
+  .flash-msg.success { background: rgba(74,222,128,.1); border: 1px solid rgba(74,222,128,.2); color: var(--success); }
+
+  .auth-card {
+    max-width: 420px;
+    margin: 60px auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+  }
+
+  .auth-title {
+    font-size: 22px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 24px;
+  }
+
+  .form-group { margin-bottom: 16px; }
+
+  .form-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+
+  .form-input {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    transition: border-color .15s;
+  }
+  .form-input:focus { outline: none; border-color: var(--accent); }
+
+  .btn {
+    padding: 10px 24px;
+    border-radius: 8px;
+    border: none;
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .15s;
+    display: inline-block;
+    text-decoration: none;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #5a4fcf);
+    color: white;
+    width: 100%;
+    text-align: center;
+  }
+  .btn-primary:hover { box-shadow: 0 4px 16px rgba(124,106,247,.3); transform: translateY(-1px); }
+
+  .auth-footer {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .auth-footer a { color: var(--accent); text-decoration: none; }
+  .auth-footer a:hover { text-decoration: underline; }
+</style>
+{% block extra_head %}{% endblock %}
+</head>
+<body>
+<div class="container">
+  <header>
+    <a href="{{ url_for('index') }}" class="logo">
+      <div class="logo-icon">&#x1F4C4;</div>
+      <div>
+        <div class="logo-text">PDF Intelligence</div>
+        <div class="logo-sub">v2.0 &middot; powered by AI</div>
+      </div>
+    </a>
+    <div class="nav-links">
+      {% if current_user.is_authenticated %}
+        <span class="user-badge">{{ current_user.email }}</span>
+        <a href="{{ url_for('auth.logout') }}" class="nav-link">Logout</a>
+      {% else %}
+        <a href="{{ url_for('auth.login') }}" class="nav-link">Login</a>
+        <a href="{{ url_for('auth.register') }}" class="nav-link">Register</a>
+      {% endif %}
+    </div>
+  </header>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-messages">
+        {% for category, message in messages %}
+          <div class="flash-msg {{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  {% block content %}{% endblock %}
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

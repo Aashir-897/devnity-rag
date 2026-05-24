@@ -4,6 +4,7 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+Devnity PDF Ai Web App/
 
 # Virtual environment
 myenv310/
@@ -29,6 +30,10 @@ Thumbs.db
 test.py     
 error.txt
 feature.txt
+ui.txt
+app_stderr.log
+app_stdout.log
+instance/
 
 AGENTS.md
 setup.txt

@@ -1,10 +1,5 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PDF Intelligence System</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+{% extends "base.html" %}
+{% block extra_head %}
 <style>
   :root {
     --bg: #0a0a0f;
@@ -767,11 +762,26 @@
     color: var(--muted); font-size: 10px; font-weight: 600;
     text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px;
   }
+
+  .documents-section { margin: 24px 0; }
+  .documents-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .doc-card {
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 12px 16px; border-radius: 8px; cursor: pointer;
+    margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;
+    transition: border-color .15s;
+  }
+  .doc-card:hover { border-color: var(--accent); }
+  .doc-name { color: var(--text); font-weight: 500; font-size: 14px; }
+  .doc-meta { color: var(--muted); font-size: 12px; }
+  .doc-delete {
+    background: none; border: 1px solid var(--border); color: var(--error);
+    padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px;
+  }
+  .doc-delete:hover { background: rgba(248,113,113,.1); }
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js">
-</script>
-</head>
-<body>
+{% endblock %}
+{% block content %}
 <div class="container">
 
   <header>
@@ -787,6 +797,21 @@
       system online
     </div>
   </header>
+
+  {% if documents %}
+  <div class="documents-section">
+    <h3>Your Documents</h3>
+    {% for doc in documents %}
+    <div class="doc-card" onclick="selectDoc('{{ doc.id }}', '{{ doc.original_name }}')">
+      <div>
+        <div class="doc-name">{{ doc.original_name }}</div>
+        <div class="doc-meta">{{ doc.total_pages }} pages &middot; {{ doc.num_chunks }} chunks</div>
+      </div>
+      <button class="doc-delete" onclick="event.stopPropagation(); deleteDoc('{{ doc.id }}')">Delete</button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
 
   <!-- Upload Zone -->
   <div class="upload-zone" id="uploadZone">
@@ -964,7 +989,10 @@
   </div><!-- /app-layout -->
 
 </div><!-- /container -->
-
+{% endblock %}
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js">
+</script>
 <script>
 let currentPdfId = null;
 let mcqAnswered  = 0;
@@ -1383,6 +1411,29 @@ function toggleViewer() {
   }
 }
 
+async function selectDoc(pdfId, name) {
+  currentPdfId = pdfId;
+  document.querySelectorAll('.doc-card').forEach(c => c.style.borderColor = '');
+  event.currentTarget.style.borderColor = 'var(--accent)';
+  try {
+    const r = await fetch('/pdf/' + pdfId + '/info');
+    const data = await r.json();
+    showResults(data);
+  } catch (e) {
+    console.error('Error loading doc info:', e);
+    document.getElementById('pdfViewerPanel').style.display = 'block';
+    loadPDF('/pdf/' + pdfId + '/file');
+  }
+}
+
+async function deleteDoc(pdfId) {
+  if (!confirm('Delete this document?')) return;
+  try {
+    const r = await fetch('/pdf/' + pdfId, { method: 'DELETE' });
+    if (r.ok) location.reload();
+  } catch (e) { console.error(e); }
+}
+
 async function loadPDF(url) {
   try {
     pdfViewer = await pdfjsLib.getDocument(url).promise;
@@ -1449,5 +1500,4 @@ async function highlightLine(pageNum, lineNum) {
   setTimeout(() => overlay.remove(), 2500);
 }
 </script>
-</body>
-</html>
+{% endblock %}
