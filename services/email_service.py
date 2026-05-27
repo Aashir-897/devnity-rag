@@ -1,13 +1,24 @@
 """SMTP email service — send verification, password reset, and general emails."""
+import os
 import smtplib
+import traceback
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from config import SMTP_SERVER, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, MAIL_FROM, MAIL_FROM_NAME, APP_URL
 
+EMAIL_LOG = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage", "email_debug.log")
+
+
+def _log(msg: str):
+    with open(EMAIL_LOG, "a") as f:
+        f.write(f"{msg}\n")
+
 
 def send_email(to: str, subject: str, html_body: str) -> bool:
+    _log(f"send_email to={to} subject={subject}")
+    _log(f"  config: SMTP_SERVER={SMTP_SERVER} SMTP_USERNAME={SMTP_USERNAME} MAIL_FROM={MAIL_FROM}")
     if not SMTP_SERVER or not SMTP_USERNAME:
-        print("SMTP not configured — skipping email to", to)
+        _log("  SKIP — SMTP_SERVER or SMTP_USERNAME empty")
         return False
     try:
         msg = MIMEMultipart("alternative")
@@ -18,9 +29,10 @@ def send_email(to: str, subject: str, html_body: str) -> bool:
         with smtplib.SMTP_SSL(SMTP_SERVER, 465, timeout=10) as server:
             server.login(SMTP_USERNAME, SMTP_PASSWORD)
             server.sendmail(MAIL_FROM, [to], msg.as_string())
+        _log("  SUCCESS")
         return True
     except Exception as e:
-        print(f"Email send failed to {to}: {e}")
+        _log(f"  FAILED: {e}\n{traceback.format_exc()}")
         return False
 
 

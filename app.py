@@ -9,7 +9,7 @@ from flask import Flask, request, jsonify, render_template, Response, send_file,
 from flask_cors import CORS
 from flask_login import LoginManager, login_required, login_user, current_user
 
-from config import TEMP_DIR, IMAGES_DIR, PDFS_DIR, PORT, HOST, DEBUG, DATABASE_URL, SESSION_SECRET
+from config import TEMP_DIR, IMAGES_DIR, PDFS_DIR, PORT, HOST, DEBUG, DATABASE_URL, SESSION_SECRET, SMTP_SERVER, SMTP_USERNAME, MAIL_FROM
 from models import db, User
 from routes.auth import auth_bp
 from services.pdf_processor import process_pdf, is_text_empty
@@ -510,6 +510,32 @@ def analytics_page():
 def health():
     doc_count = Document.query.count() if Document else 0
     return jsonify({"status": "ok", "documents": doc_count})
+
+
+@app.route("/debug/test-email", methods=["POST"])
+@login_required
+def debug_test_email():
+    from services.email_service import send_email, EMAIL_LOG
+    to = request.json.get("email", current_user.email)
+    # Clear previous log
+    open(EMAIL_LOG, "w").close()
+    result = send_email(to, "Devnity AI — Debug Test", "<h1>Test</h1><p>If you see this, email works!</p>")
+    try:
+        log_content = open(EMAIL_LOG).read()
+    except Exception:
+        log_content = "(could not read log)"
+    return jsonify({"success": result, "log": log_content})
+
+
+@app.route("/debug/email-log", methods=["GET"])
+@login_required
+def debug_email_log():
+    from services.email_service import EMAIL_LOG
+    try:
+        content = open(EMAIL_LOG).read()
+    except Exception:
+        content = "(no log file yet)"
+    return f"<pre>{content}</pre>", 200, {"Content-Type": "text/html; charset=utf-8"}
 
 
 # ── Run ───────────────────────────────────────────────────────────────────────
