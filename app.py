@@ -22,7 +22,17 @@ from services import storage_service
 
 
 app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
+# Strip ssl-mode param (PyMySQL doesn't support it)
+_db_url = DATABASE_URL
+if _db_url:
+    from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
+    _parsed = urlparse(_db_url)
+    if _parsed.query:
+        _qs = parse_qs(_parsed.query)
+        _qs.pop("ssl-mode", None)
+        _parsed = _parsed._replace(query=urlencode(_qs, doseq=True))
+        _db_url = urlunparse(_parsed)
+app.config["SQLALCHEMY_DATABASE_URI"] = _db_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SECRET_KEY"] = SESSION_SECRET
 app.config["SESSION_COOKIE_HTTPONLY"] = True
