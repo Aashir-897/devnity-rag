@@ -1,6 +1,7 @@
 """Email service — proxies via DO relay."""
 import os
 import requests
+from config import APP_URL
 
 MAIL_RELAY_URL = "https://rag.devnity.me/send-email"
 
