@@ -57,14 +57,8 @@ CHUNK_OVERLAP = 150
 # ── Retrieval ─────────────────────────────────────────
 TOP_K_CHUNKS = 5
 
-# ── Email (SMTP) ──────────────────────────────────────
-SMTP_SERVER   = os.getenv("SMTP_SERVER", "")
-SMTP_PORT     = int(os.getenv("SMTP_PORT", 587))
-SMTP_USERNAME = os.getenv("SMTP_USERNAME", "")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-MAIL_FROM     = os.getenv("MAIL_FROM", "noreply@devnity.ai")
-MAIL_FROM_NAME = os.getenv("MAIL_FROM_NAME", "Devnity AI")
-APP_URL       = os.getenv("APP_URL", "http://localhost:5000")
+# ── Email ─────────────────────────────────────────────
+APP_URL = os.getenv("APP_URL", "https://rag.devnity.me")
 
 # ── Flask ─────────────────────────────────────────────
 DEBUG = os.getenv("DEBUG", "true").lower() == "true"
