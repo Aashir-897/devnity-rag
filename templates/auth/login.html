@@ -1,20 +1,70 @@
 {% extends "base.html" %}
+
+{% set is_auth_page = true %}
+
+{% block title %}Sign In - Devnity AI{% endblock %}
+
 {% block content %}
+<div class="auth-logo">
+    <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="Devnity AI">
+    <p class="auth-logo-text">PDF Intelligence</p>
+</div>
+
 <div class="auth-card">
-  <div class="auth-title">Welcome Back</div>
-  <form method="POST">
-    <div class="form-group">
-      <label class="form-label">Email</label>
-      <input type="email" name="email" class="form-input" placeholder="you@example.com" required autofocus>
+    <h1 class="auth-title">Welcome back</h1>
+    <p class="auth-subtitle">Sign in to your account</p>
+
+    {% if error %}
+    <div class="auth-message error">
+        {{ error }}
     </div>
-    <div class="form-group">
-      <label class="form-label">Password</label>
-      <input type="password" name="password" class="form-input" placeholder="&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;&#xb7;" required>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('auth.login') }}">
+
+        <div class="form-group">
+            <label for="email" class="form-label">Email</label>
+            <input
+                type="email"
+                id="email"
+                name="email"
+                class="form-input"
+                placeholder="Enter your email"
+                required
+                autofocus
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="password" class="form-label">Password</label>
+            <input
+                type="password"
+                id="password"
+                name="password"
+                class="form-input"
+                placeholder="Enter your password"
+                required
+            >
+        </div>
+
+        <div class="form-group" style="display: flex; justify-content: space-between; align-items: center;">
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.875rem; color: var(--muted);">
+                <input type="checkbox" name="remember" style="width: 1rem; height: 1rem; accent-color: var(--accent);">
+                Remember me
+            </label>
+            <a href="{{ url_for('auth.forgot_password') }}" style="font-size: 0.875rem; color: var(--accent); text-decoration: none;">
+                Forgot password?
+            </a>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%;">
+            Sign in
+        </button>
+    </form>
+
+    <div class="auth-footer">
+        Don't have an account?
+        <a href="{{ url_for('auth.register') }}">Sign up</a>
     </div>
-    <button type="submit" class="btn btn-primary">Login</button>
-  </form>
-  <div class="auth-footer">
-    Don't have an account? <a href="{{ url_for('auth.register') }}">Register</a>
-  </div>
 </div>
 {% endblock %}

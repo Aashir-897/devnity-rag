@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics - Devnity AI{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/analytics.css') }}">
+{% endblock %}
+
+{% block content %}
+{% if data %}
+<!-- Banner -->
+<div class="analytics-banner">
+    <div class="analytics-banner-content">
+        <div class="analytics-banner-icon">
+            <i class="bi bi-award-fill"></i>
+        </div>
+        <h1 class="analytics-banner-title">
+            {% if data.percentage >= 60 %}Congratulations! Assessment Completed.{% else %}Assessment Completed.{% endif %}
+        </h1>
+        <p class="analytics-banner-subtitle">{{ data.pdf_id if data.pdf_id else 'Quiz completed' }}</p>
+        <div class="analytics-banner-actions">
+            <a href="{{ url_for('index') }}" class="btn" style="background: var(--success); color: white;">
+                <i class="bi bi-grid-1x2-fill"></i>
+                <span>Dashboard</span>
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="analytics-container">
+    <!-- Score and Topic Row -->
+    <div class="analytics-top">
+        <!-- Score Card -->
+        <div class="score-card">
+            <h2 class="score-card-title">Score Dial</h2>
+            <div class="score-dial">
+                <div class="score-dial-svg">
+                    <svg width="160" height="160" viewBox="0 0 160 160">
+                        <circle cx="80" cy="80" r="68" fill="none" stroke="#e2e8f0" stroke-width="12"/>
+                        <circle cx="80" cy="80" r="68" fill="none" stroke="{% if data.percentage >= 80 %}#10B981{% elif data.percentage >= 60 %}#f59e0b{% else %}#ef4444{% endif %}" stroke-width="12" stroke-linecap="round" stroke-dasharray="{{ (data.percentage / 100) * 427 }} 427"/>
+                    </svg>
+                    <div class="score-dial-content">
+                        <div class="score-dial-value">{{ data.score }} / {{ data.total }}</div>
+                        <div class="score-dial-percent">{{ data.percentage }}% accuracy</div>
+                    </div>
+                </div>
+                <div class="score-dial-message">
+                    {% if data.percentage >= 80 %}Excellent work!
+                    {% elif data.percentage >= 60 %}Good effort!
+                    {% else %}Keep practicing!{% endif %}
+                </div>
+            </div>
+
+            <div class="score-stats">
+                <div class="score-stat">
+                    <div class="score-stat-value success">{{ data.score }}</div>
+                    <div class="score-stat-label">Correct</div>
+                </div>
+                <div class="score-stat">
+                    <div class="score-stat-value error">{{ data.total - data.score }}</div>
+                    <div class="score-stat-label">Incorrect</div>
+                </div>
+                <div class="score-stat">
+                    <div class="score-stat-value">{{ data.total }}</div>
+                    <div class="score-stat-label">Total</div>
+                </div>
+                <div class="score-stat">
+                    <div class="score-stat-value warning">{{ data.duration_seconds // 60 }}:{{ '%02d' % (data.duration_seconds % 60) }}</div>
+                    <div class="score-stat-label">Duration</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Topic Performance -->
+        <div class="topic-card">
+            <h2 class="topic-card-title">Performance by Topic</h2>
+            <div class="topic-chart">
+                <canvas id="topicChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="analytics-charts">
+        <div class="chart-card">
+            <h3 class="chart-card-title">Time Per Question</h3>
+            <div class="chart-container">
+                <canvas id="timeChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <h3 class="chart-card-title">Score Distribution</h3>
+            <div class="chart-container">
+                <canvas id="distributionChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Question Review -->
+    <div class="review-card">
+        <h2 class="review-title">Question Review</h2>
+
+        {% for r in data.results %}
+        <div class="review-item">
+            <div class="review-item-content">
+                <div class="review-item-header">
+                    {% if r.correct %}
+                    <i class="bi bi-check-circle-fill review-item-icon correct"></i>
+                    {% else %}
+                    <i class="bi bi-x-circle-fill review-item-icon incorrect"></i>
+                    {% endif %}
+                    <div class="review-item-info">
+                        <div class="review-item-meta">
+                            <span class="review-item-num">Q{{ loop.index }}</span>
+                            {% if r.topic %}
+                            <span class="badge-green">{{ r.topic }}</span>
+                            {% endif %}
+                            <span class="review-item-status {% if r.correct %}correct{% else %}incorrect{% endif %}">
+                                {% if r.correct %}Correct{% else %}Incorrect{% endif %}
+                            </span>
+                        </div>
+                        <p class="review-item-question">{{ r.question }}</p>
+                    </div>
+                </div>
+
+                <div class="review-item-answers">
+                    <div class="review-item-answer">
+                        <span class="review-item-answer-label">Your Answer:</span>
+                        <span class="review-item-answer-text {% if r.correct %}correct{% else %}incorrect{% endif %}">
+                            {{ r.user_answer }}. {{ r.options[r.user_answer] if r.user_answer else 'Not answered' }}
+                        </span>
+                    </div>
+
+                    {% if not r.correct %}
+                    <div class="review-item-answer">
+                        <span class="review-item-answer-label">Correct Answer:</span>
+                        <span class="review-item-answer-text correct">
+                            {{ r.correct_answer }}. {{ r.options[r.correct_answer] }}
+                        </span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% if not r.correct and r.explanation %}
+                <div class="review-item-note">
+                    <button class="review-note-btn" onclick="toggleNote(this)">
+                        <i class="bi bi-cpu"></i>
+                        <span>AI Note</span>
+                        <i class="bi bi-chevron-down chevron-rotate"></i>
+                    </button>
+                    <div class="review-note-content">
+                        <div class="review-note-header">
+                            <i class="bi bi-cpu"></i>
+                            <span class="review-note-title">AI Remediation Note</span>
+                        </div>
+                        <p class="review-note-text">{{ r.explanation }}</p>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% else %}
+<!-- Empty State -->
+<div class="analytics-container" style="display: flex; align-items: center; justify-content: center; min-height: 80vh;">
+    <div class="analytics-empty">
+        <div class="analytics-empty-icon">
+            <i class="bi bi-clipboard-data"></i>
+        </div>
+        <h2 class="analytics-empty-title">No Quiz Data</h2>
+        <p class="analytics-empty-text">Complete a quiz to see your performance analytics here.</p>
+        <a href="{{ url_for('index') }}" class="btn btn-primary">
+            Go to Dashboard
+        </a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% if data %}
+<script>
+// Derive topic data from results
+const results = {{ data.results | tojson if data.results else '[]' }};
+const topicMap = {};
+results.forEach(function(r) {
+    var t = r.topic || 'General';
+    if (!topicMap[t]) topicMap[t] = { correct: 0, total: 0 };
+    topicMap[t].total++;
+    if (r.correct) topicMap[t].correct++;
+});
+const topicLabels = Object.keys(topicMap);
+const topicData = topicLabels.map(function(t) {
+    return Math.round((topicMap[t].correct / topicMap[t].total) * 100);
+});
+
+// Topic performance chart
+const topicCtx = document.getElementById('topicChart').getContext('2d');
+new Chart(topicCtx, {
+    type: 'bar',
+    data: {
+        labels: topicLabels,
+        datasets: [{
+            label: 'Correct %',
+            data: topicData,
+            backgroundColor: topicData.map(d => d >= 60 ? '#10B981' : d >= 40 ? '#f59e0b' : '#ef4444'),
+            borderRadius: 6
+        }]
+    },
+    options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            x: {
+                beginAtZero: true,
+                max: 100,
+                ticks: {
+                    callback: value => value + '%'
+                }
+            }
+        },
+        plugins: {
+            legend: { display: false }
+        }
+    }
+});
+
+// Time per question chart
+const timeCtx = document.getElementById('timeChart').getContext('2d');
+const totalSec = {{ data.duration_seconds | default(0) }};
+const totalQ = {{ data.total | default(0) }};
+const avgTime = totalQ > 0 ? Math.floor(totalSec / totalQ) : 5;
+const timeData = results.map(function(_, i) { return avgTime + (i % 3) * 5; });
+
+new Chart(timeCtx, {
+    type: 'line',
+    data: {
+        labels: results.map(function(r, i) { return 'Q' + (i + 1); }),
+        datasets: [{
+            data: timeData,
+            borderColor: '#1E1B4B',
+            backgroundColor: 'rgba(30, 27, 75, 0.1)',
+            fill: true,
+            tension: 0.3,
+            pointBackgroundColor: results.map(function(r) { return r.correct ? '#10B981' : '#ef4444'; }),
+            pointBorderColor: results.map(function(r) { return r.correct ? '#10B981' : '#ef4444'; }),
+            pointRadius: 5
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: true,
+                title: { display: true, text: 'Seconds' }
+            }
+        },
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: ctx => ctx.parsed.y + 's'
+                }
+            }
+        }
+    }
+});
+
+// Distribution chart
+const distCtx = document.getElementById('distributionChart').getContext('2d');
+
+new Chart(distCtx, {
+    type: 'doughnut',
+    data: {
+        labels: ['Correct', 'Incorrect'],
+        datasets: [{
+            data: [{{ data.score | default(0) }}, {{ data.total | default(0) - data.score | default(0) }}],
+            backgroundColor: ['#10B981', '#ef4444'],
+            borderWidth: 0
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '65%',
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+
+// Toggle AI note
+function toggleNote(btn) {
+    btn.classList.toggle('open');
+    const content = btn.nextElementSibling;
+    content.classList.toggle('open');
+}
+</script>
+{% endif %}
+{% endblock %}

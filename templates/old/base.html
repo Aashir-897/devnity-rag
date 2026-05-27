@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Devnity AI &mdash; PDF Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%231E1B4B'/><text x='8' y='12' font-size='11' fill='white' text-anchor='middle' font-family='monospace' font-weight='bold'>D</text></svg>">
+<style>
+:root {
+  --sidebar: #1E1B4B;
+  --sidebar-text: rgba(255,255,255,0.55);
+  --sidebar-active: rgba(255,255,255,0.12);
+  --sidebar-hover: rgba(255,255,255,0.07);
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --border: #e2e8f0;
+  --accent: #1E1B4B;
+  --accent-light: #eef2ff;
+  --text: #0f172a;
+  --muted: #64748b;
+  --success: #10B981;
+  --error: #ef4444;
+  --warning: #f59e0b;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+}
+.sidebar {
+  width: 240px; background: var(--sidebar); display: flex; flex-direction: column;
+  height: 100vh; position: fixed; left: 0; top: 0; z-index: 100;
+}
+.sidebar-brand {
+  padding: 20px 20px 16px; border-bottom: 1px solid rgba(255,255,255,0.1);
+  display: flex; align-items: center; gap: 10px;
+}
+.sidebar-brand-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: var(--success); display: flex; align-items: center; justify-content: center;
+  font-size: 16px; color: white; flex-shrink: 0;
+}
+.sidebar-brand-name { color: white; font-weight: 700; font-size: 15px; line-height: 1.2; }
+.sidebar-brand-sub { color: rgba(255,255,255,0.4); font-size: 11px; }
+.sidebar-nav { flex: 1; padding: 12px 12px; overflow-y: auto; }
+.sidebar-link {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 10px 12px; border-radius: 8px; border: none; background: none;
+  color: var(--sidebar-text); font-size: 13px; font-weight: 500; cursor: pointer;
+  text-decoration: none; transition: all .12s; margin-bottom: 2px; text-align: left;
+}
+.sidebar-link:hover { background: var(--sidebar-hover); color: white; }
+.sidebar-link.active { background: var(--sidebar-active); color: white; font-weight: 600; }
+.sidebar-link svg { width: 18px; height: 18px; flex-shrink: 0; }
+.sidebar-footer {
+  padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.1);
+  display: flex; align-items: center; gap: 10px;
+}
+.sidebar-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: linear-gradient(135deg, #a78bfa, #6366f1);
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 11px; font-weight: 700; flex-shrink: 0;
+}
+.sidebar-user-name { color: white; font-size: 13px; font-weight: 600; line-height: 1.2; }
+.sidebar-user-email { color: rgba(255,255,255,0.4); font-size: 11px; }
+.main-content { margin-left: 240px; flex: 1; min-height: 100vh; display: flex; flex-direction: column; }
+.flash-msg {
+  padding: 10px 16px; font-size: 13px; font-weight: 600; margin: 0;
+}
+.flash-msg.error { background: #fef2f2; color: var(--error); border-bottom: 1px solid #fecaca; }
+.flash-msg.success { background: #ecfdf5; color: var(--success); border-bottom: 1px solid #a7f3d0; }
+
+/* --- Auth Pages --- */
+.auth-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+.auth-card { width: 100%; max-width: 400px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 32px; }
+.auth-title { font-size: 20px; font-weight: 700; text-align: center; margin-bottom: 24px; }
+.form-group { margin-bottom: 16px; }
+.form-label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+.form-input { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; font-family: inherit; background: var(--bg); color: var(--text); transition: border-color .12s; }
+.form-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(30,27,75,0.1); }
+.btn { padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; border: none; cursor: pointer; font-family: inherit; transition: all .12s; }
+.btn-primary { width: 100%; background: var(--accent); color: white; }
+.btn-primary:hover { opacity: .92; }
+.auth-footer { text-align: center; font-size: 13px; color: var(--muted); margin-top: 20px; }
+.auth-footer a { color: var(--accent); font-weight: 600; text-decoration: none; }
+.auth-footer a:hover { text-decoration: underline; }
+
+/* Toast */
+.toast-container { position: fixed; top: 16px; right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+.toast {
+  padding: 12px 16px 12px 14px; border-radius: 10px; font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; gap: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  animation: toastIn .25s ease; min-width: 260px; max-width: 400px;
+  border-left: 4px solid;
+}
+.toast.info { background: #eef2ff; color: #1E1B4B; border-left-color: #6366f1; }
+.toast.success { background: #ecfdf5; color: #059669; border-left-color: #10B981; }
+.toast.error { background: #fef2f2; color: var(--error); border-left-color: var(--error); }
+.toast.warning { background: #fffbeb; color: #d97706; border-left-color: #f59e0b; }
+.toast .toast-close { margin-left: auto; background: none; border: none; cursor: pointer; font-size: 16px; opacity: .5; color: inherit; padding: 0 2px; }
+.toast .toast-close:hover { opacity: 1; }
+@keyframes toastIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+/* Confirm Modal */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+  z-index: 9998; display: none; align-items: center; justify-content: center;
+}
+.modal-overlay.visible { display: flex; }
+.modal-box {
+  background: var(--surface); border-radius: 16px; padding: 24px; width: 380px;
+  max-width: 90vw; box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+}
+.modal-box h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.modal-box p { font-size: 13px; color: var(--muted); margin-bottom: 20px; line-height: 1.5; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.modal-actions button { padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; font-family: inherit; }
+.modal-actions .modal-cancel { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+.modal-actions .modal-cancel:hover { background: var(--border); }
+.modal-actions .modal-confirm { background: var(--error); color: white; }
+.modal-actions .modal-confirm:hover { opacity: .9; }
+
+/* Bootstrap Icons spin */
+.bi-spin { display: inline-block; animation: biSpin 1s linear infinite; }
+@keyframes biSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+</style>
+{% block extra_head %}{% endblock %}
+</head>
+{% set is_auth = request.endpoint and 'auth.' in request.endpoint %}
+<body class="{% if is_auth %}auth-page{% endif %}">
+<div class="sidebar" {% if is_auth %}style="display:none"{% endif %}>
+  <a href="{{ url_for('index') }}" class="sidebar-brand" style="text-decoration:none">
+    <div class="sidebar-brand-icon"><i class="bi bi-cpu"></i></div>
+    <div>
+      <div class="sidebar-brand-name">Devnity AI</div>
+      <div class="sidebar-brand-sub">PDF Intelligence</div>
+    </div>
+  </a>
+{% set is_study = request.endpoint and 'study' in request.endpoint %}
+{% set is_quiz = request.endpoint and 'quiz' in request.endpoint %}
+{% set is_analytics = request.endpoint and 'analytics' in request.endpoint %}
+  <nav class="sidebar-nav">
+    <a href="{{ url_for('index') }}" class="sidebar-link {% if request.endpoint == 'index' %}active{% endif %}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Dashboard
+    </a>
+    <a href="{{ url_for('dashboard') }}" class="sidebar-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      My Documents
+    </a>
+    <a href="{{ url_for('study_room_list') }}" class="sidebar-link {% if is_study %}active{% endif %}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      AI Study Rooms
+    </a>
+    <a href="{{ url_for('mock_test_list') }}" class="sidebar-link {% if is_quiz %}active{% endif %}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Mock Tests
+    </a>
+    <a href="{{ url_for('analytics_page') }}" class="sidebar-link {% if is_analytics %}active{% endif %}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Analytics
+    </a>
+    {% if current_user.is_authenticated %}
+    <a href="{{ url_for('auth.logout') }}" class="sidebar-link" style="margin-top:auto">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Logout
+    </a>
+    {% endif %}
+  </nav>
+  {% if current_user.is_authenticated %}
+  <div class="sidebar-footer">
+    <div class="sidebar-avatar">{{ current_user.email[:2].upper() }}</div>
+    <div class="min-w-0" style="overflow:hidden">
+      <div class="sidebar-user-name">{{ current_user.email.split('@')[0] }}</div>
+      <div class="sidebar-user-email" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ current_user.email }}</div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<div class="main-content" {% if is_auth %}style="margin-left:0"{% endif %}>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="flash-msg {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal-box">
+    <h3 id="modalTitle"><i class="bi bi-exclamation-triangle" style="color:var(--error)"></i> <span id="modalTitleText">Confirm</span></h3>
+    <p id="modalMessage">Are you sure?</p>
+    <div class="modal-actions">
+      <button class="modal-cancel" id="modalCancel">Cancel</button>
+      <button class="modal-confirm" id="modalConfirm">Delete</button>
+    </div>
+  </div>
+</div>
+
+{% block scripts %}{% endblock %}
+
+<script>
+function showToast(message, type, duration) {
+  type = type || 'info';
+  duration = duration || 4000;
+  var icons = { info: 'bi-info-circle', success: 'bi-check-circle', error: 'bi-x-circle', warning: 'bi-exclamation-triangle' };
+  var container = document.getElementById('toastContainer');
+  var t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.innerHTML = '<i class="bi ' + (icons[type] || icons.info) + '"></i><span>' + message + '</span><button class="toast-close" onclick="this.parentElement.remove()">&times;</button>';
+  container.appendChild(t);
+  setTimeout(function() { if (t.parentElement) { t.style.opacity = '0'; t.style.transition = 'opacity .3s'; setTimeout(function() { t.remove(); }, 300); } }, duration);
+}
+
+var _confirmResolve = null;
+function showConfirm(message, title) {
+  title = title || 'Confirm';
+  return new Promise(function(resolve) {
+    _confirmResolve = resolve;
+    document.getElementById('modalTitleText').textContent = title;
+    document.getElementById('modalMessage').textContent = message;
+    document.getElementById('confirmModal').classList.add('visible');
+  });
+}
+document.getElementById('modalConfirm').addEventListener('click', function() {
+  document.getElementById('confirmModal').classList.remove('visible');
+  if (_confirmResolve) _confirmResolve(true);
+});
+document.getElementById('modalCancel').addEventListener('click', function() {
+  document.getElementById('confirmModal').classList.remove('visible');
+  if (_confirmResolve) _confirmResolve(false);
+});
+document.getElementById('confirmModal').addEventListener('click', function(e) {
+  if (e.target === this) { this.classList.remove('visible'); if (_confirmResolve) _confirmResolve(false); }
+});
+</script>
+</body>
+</html>

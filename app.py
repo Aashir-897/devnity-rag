@@ -5,7 +5,7 @@ import uuid
 import time
 import shutil
 import threading
-from flask import Flask, request, jsonify, render_template, Response, send_from_directory, redirect
+from flask import Flask, request, jsonify, render_template, Response, send_file, send_from_directory, redirect, url_for, session, flash
 from flask_cors import CORS
 from flask_login import LoginManager, login_required, login_user, current_user
 
@@ -44,6 +44,16 @@ def load_user(user_id: str):
 with app.app_context():
     from models import User, Document  # noqa
     db.create_all()
+    # Auto-migrate: add new columns if missing (safe for re-runs)
+    import sqlalchemy as sa
+    inspector = sa.inspect(db.engine)
+    cols = {c["name"] for c in inspector.get_columns("users")}
+    for col, dtype in [("is_verified", "BOOLEAN DEFAULT 1"), ("verification_token", "VARCHAR(100)"), ("reset_token", "VARCHAR(100)"), ("reset_token_expires", "DATETIME")]:
+        if col not in cols:
+            with db.engine.connect() as conn:
+                conn.execute(sa.text(f"ALTER TABLE users ADD COLUMN {col} {dtype}"))
+                conn.commit()
+            print(f"Migrated: added column {col} to users table")
 
 app.register_blueprint(auth_bp)
 
@@ -57,7 +67,14 @@ _processing_status = {}  # {user_id}:{pdf_id} -> {step, progress, message, done,
 def index():
     docs = Document.query.filter_by(user_id=current_user.id, status="ready")\
         .order_by(Document.created_at.desc()).all()
-    return render_template("index.html", documents=docs)
+    total_docs = len(docs)
+    total_chunks = sum(d.num_chunks for d in docs)
+    stats = {
+        "total_docs": total_docs,
+        "ai_queries": total_chunks,
+        "avg_score": 0
+    }
+    return render_template("index.html", documents=docs, stats=stats)
 
 
 def _status_key(user_id, pdf_id):
@@ -339,7 +356,7 @@ def serve_pdf(pdf_id):
 
     local_path = storage_service.get_local_path(pdf_id)
     if local_path and os.path.exists(local_path):
-        return send_from_directory(os.path.dirname(local_path), os.path.basename(local_path))
+        return send_file(local_path, mimetype="application/pdf", as_attachment=False)
 
     return jsonify({"error": "PDF file not available"}), 404
 
@@ -369,6 +386,114 @@ def delete_pdf(pdf_id):
     db.session.commit()
 
     return jsonify({"message": "PDF deleted successfully"})
+
+
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    docs = Document.query.filter_by(user_id=current_user.id)\
+        .order_by(Document.created_at.desc()).all()
+    return render_template("dashboard.html", documents=docs)
+
+
+@app.route("/study/<pdf_id>")
+@login_required
+def study_room(pdf_id):
+    doc = _get_doc_or_404(pdf_id)
+    if not doc:
+        return jsonify({"error": "PDF not found"}), 404
+    session["last_pdf_id"] = pdf_id
+    return render_template("study.html", doc=doc, pdf_url=url_for("serve_pdf", pdf_id=pdf_id))
+
+
+@app.route("/quiz/<pdf_id>")
+@login_required
+def quiz_page(pdf_id):
+    doc = _get_doc_or_404(pdf_id)
+    if not doc:
+        return jsonify({"error": "PDF not found"}), 404
+    session["last_pdf_id"] = pdf_id
+    return render_template("quiz.html", doc=doc, total_questions=5)
+
+
+@app.route("/quiz/submit", methods=["POST"])
+@login_required
+def quiz_submit():
+    data = request.json
+    pdf_id = data.get("pdf_id", "")
+    questions = data.get("questions", [])
+    answers = data.get("answers", {})
+    duration_seconds = data.get("duration_seconds", 0)
+    
+    correct = 0
+    total = len(questions)
+    results = []
+    for i, q in enumerate(questions):
+        qid = str(i)
+        user_ans = answers.get(qid)
+        correct_ans = q.get("answer", "")
+        is_correct = user_ans == correct_ans
+        if is_correct:
+            correct += 1
+        results.append({
+            "id": qid,
+            "question": q.get("question", ""),
+            "options": q.get("options", {}),
+            "correct": is_correct,
+            "user_answer": user_ans,
+            "correct_answer": correct_ans,
+            "explanation": q.get("explanation", ""),
+            "source": q.get("source", ""),
+        })
+    
+    score_pct = round((correct / total) * 100) if total > 0 else 0
+    result_data = {
+        "pdf_id": pdf_id,
+        "score": correct,
+        "total": total,
+        "percentage": score_pct,
+        "results": results,
+        "duration_seconds": duration_seconds,
+    }
+    session["last_quiz_result"] = result_data
+    return jsonify(result_data)
+
+
+@app.route("/analytics", methods=["POST"])
+@login_required
+def analytics():
+    data = request.json
+    return render_template("analytics.html", data=data)
+
+
+@app.route("/study-room")
+@login_required
+def study_room_list():
+    last_id = session.get("last_pdf_id")
+    if not last_id:
+        flash("Open a document from the dashboard first.", "error")
+        return redirect(url_for("index"))
+    return redirect(url_for("study_room", pdf_id=last_id))
+
+
+@app.route("/mock-test")
+@login_required
+def mock_test_list():
+    last_id = session.get("last_pdf_id")
+    if not last_id:
+        flash("Open a document from the dashboard first.", "error")
+        return redirect(url_for("index"))
+    return redirect(url_for("quiz_page", pdf_id=last_id))
+
+
+@app.route("/analytics-page")
+@login_required
+def analytics_page():
+    last_result = session.get("last_quiz_result")
+    if not last_result:
+        flash("Complete a quiz first to see analytics.", "error")
+        return redirect(url_for("index"))
+    return render_template("analytics.html", data=last_result)
 
 
 @app.route("/health", methods=["GET"])

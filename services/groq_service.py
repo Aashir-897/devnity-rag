@@ -107,6 +107,8 @@ IMPORTANT: For each question, include the exact source reference:
 - "page": The page number where the source appears (from [Page N, Line M] markers)
 - "line": The line number where the source appears (from [Page N, Line M] markers)
 
+INCLUDE A "topic" FIELD FOR EACH QUESTION that describes which section or concept this question tests (e.g., "Architectural Concepts", "Data Synchronization", "Microservice Patterns", etc.).
+
 RESPONSE FORMAT (strict JSON array):
 [
   {{
@@ -119,6 +121,7 @@ RESPONSE FORMAT (strict JSON array):
     }},
     "answer": "A",
     "explanation": "Brief explanation why A is correct",
+    "topic": "Topic name here",
     "source": "Verbatim excerpt supporting this question",
     "page": 3,
     "line": 12

@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<style>
+.quiz-layout { display: flex; flex-direction: column; height: 100vh; background: var(--bg); }
+
+.quiz-topbar {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 12px 24px; display: flex; align-items: center; gap: 16px; flex-shrink: 0;
+}
+.quiz-topbar a { color: var(--muted); text-decoration: none; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.quiz-topbar a:hover { color: var(--text); }
+.quiz-topbar .sep { width: 1px; height: 16px; background: var(--border); }
+.quiz-topbar .mid { flex: 1; }
+.quiz-topbar .mid .qt { font-size: 14px; font-weight: 700; color: var(--text); }
+.quiz-topbar .mid .qs { font-size: 11px; color: var(--muted); margin-top: 2px; display: flex; align-items: center; gap: 12px; }
+.progress-bar-bg { flex: 1; height: 6px; background: var(--bg); border-radius: 100px; overflow: hidden; }
+.progress-bar-fill { height: 100%; background: var(--accent); border-radius: 100px; transition: width .3s; }
+.quiz-timer {
+  display: flex; align-items: center; gap: 8px; background: #fffbeb;
+  border: 1px solid #fcd34d; border-radius: 8px; padding: 6px 12px;
+  font-size: 14px; font-weight: 700; color: #b45309; font-family: 'JetBrains Mono', monospace;
+}
+
+.quiz-body { flex: 1; display: flex; overflow: hidden; }
+
+/* Question Area */
+.question-area { flex: 1; overflow-y: auto; padding: 32px; }
+.question-area .inner { max-width: 640px; }
+.q-badge {
+  display: inline-block; background: var(--accent); color: white; font-size: 11px;
+  font-weight: 700; padding: 4px 12px; border-radius: 100px; margin-bottom: 16px;
+}
+.q-text { font-size: 18px; font-weight: 700; line-height: 1.5; margin-bottom: 24px; }
+.option-btn {
+  width: 100%; text-align: left; padding: 14px 16px; border-radius: 12px;
+  border: 2px solid var(--border); background: var(--surface); cursor: pointer;
+  display: flex; align-items: center; gap: 12px; margin-bottom: 10px;
+  font-family: inherit; transition: all .12s;
+}
+.option-btn:hover { border-color: #cbd5e1; }
+.option-btn.selected { border-color: var(--accent); background: var(--accent-light); }
+.option-btn .radio {
+  width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all .12s;
+}
+.option-btn.selected .radio { border-color: var(--accent); background: var(--accent); }
+.option-btn.selected .radio::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: white; }
+.option-btn .opt-label { font-weight: 700; color: var(--muted); margin-right: 4px; }
+.option-btn.selected .opt-label, .option-btn.selected .opt-text { color: var(--accent); font-weight: 600; }
+.option-btn .opt-text { font-size: 14px; color: var(--text); }
+
+/* Nav Sidebar */
+.nav-sidebar {
+  width: 260px; background: var(--surface); border-left: 1px solid var(--border);
+  padding: 20px; overflow-y: auto; flex-shrink: 0;
+}
+.nav-sidebar h4 { font-size: 14px; font-weight: 700; margin-bottom: 16px; }
+.nav-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 16px; }
+.nav-btn {
+  width: 40px; height: 40px; border-radius: 8px; border: 2px solid var(--border);
+  background: var(--surface); font-size: 12px; font-weight: 700; color: var(--muted);
+  cursor: pointer; transition: all .12s; font-family: inherit;
+}
+.nav-btn:hover { opacity: .8; }
+.nav-btn.current { background: var(--accent); border-color: var(--accent); color: white; }
+.nav-btn.answered { background: var(--success); border-color: var(--success); color: white; }
+.nav-btn.flagged { background: var(--warning); border-color: var(--warning); color: white; }
+.nav-legend { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+.nav-legend .leg-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.nav-legend .leg-swatch { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--border); }
+.nav-stats { background: var(--bg); border-radius: 12px; padding: 16px; }
+.nav-stats .stat-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; }
+.nav-stats .stat-row .val { font-weight: 700; }
+
+/* Bottom Bar */
+.quiz-bottombar {
+  background: var(--surface); border-top: 1px solid var(--border);
+  padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+}
+.quiz-bottombar button {
+  display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px;
+  font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; border: none; transition: all .12s;
+}
+.quiz-bottombar .prev-btn { background: none; color: var(--muted); border: 1px solid var(--border); }
+.quiz-bottombar .prev-btn:hover { background: var(--bg); }
+.quiz-bottombar .flag-btn { border: 1px solid var(--border); background: var(--surface); }
+.quiz-bottombar .flag-btn:hover { background: var(--bg); }
+.quiz-bottombar .flag-btn.is-flagged { background: #fffbeb; border-color: #fcd34d; color: #b45309; }
+.quiz-bottombar .next-btn { background: var(--accent); color: white; }
+.quiz-bottombar .next-btn:hover { opacity: .9; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="quizApp" class="quiz-layout">
+  <!-- Top Bar -->
+  <div class="quiz-topbar">
+    <a href="{{ url_for('study_room', pdf_id=doc.id) }}"><i class="bi bi-arrow-left"></i> Study Room</a>
+    <span class="sep"></span>
+    <div class="mid">
+      <div class="qt">Quiz: {{ doc.original_name }}</div>
+      <div class="qs">
+        <span class="progress-bar-bg"><span class="progress-bar-fill" id="quizProgress" style="width:0%"></span></span>
+        <span id="qCounter">Question 1 of <span id="totalQ">5</span></span>
+      </div>
+    </div>
+    <div class="quiz-timer"><i class="bi bi-clock"></i><span id="timerDisplay">15:00</span></div>
+  </div>
+
+  <!-- Body -->
+  <div class="quiz-body">
+    <div class="question-area" id="questionArea">
+      <div class="inner" id="questionInner">
+        <div style="text-align:center;padding:60px 0;color:var(--muted)">
+          <i class="bi bi-arrow-clockwise bi-spin" style="font-size:24px"></i>
+          <p style="margin-top:12px">Loading questions...</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav-sidebar">
+      <h4>Question Navigator</h4>
+      <div class="nav-grid" id="navGrid"></div>
+      <div class="nav-legend">
+        <div class="leg-item"><span class="leg-swatch" style="background:var(--success);border-color:var(--success)"></span> Answered</div>
+        <div class="leg-item"><span class="leg-swatch" style="background:var(--warning);border-color:var(--warning)"></span> Flagged for Review</div>
+        <div class="leg-item"><span class="leg-swatch" style="background:var(--accent);border-color:var(--accent)"></span> Current</div>
+        <div class="leg-item"><span class="leg-swatch" style="background:var(--surface)"></span> Unvisited</div>
+      </div>
+      <div class="nav-stats" id="navStats">
+        <div class="stat-row"><span>Answered</span><span class="val" id="statAnswered">0</span></div>
+        <div class="stat-row"><span>Flagged</span><span class="val" id="statFlagged">0</span></div>
+        <div class="stat-row"><span>Remaining</span><span class="val" id="statRemaining">0</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Bar -->
+  <div class="quiz-bottombar">
+    <button class="prev-btn" onclick="prevQ()"><i class="bi bi-arrow-left"></i> Previous</button>
+    <button class="flag-btn" id="flagBtn" onclick="toggleFlag()"><i class="bi bi-flag"></i> Flag for Review</button>
+    <button class="next-btn" id="nextBtn" onclick="nextQ()">Next <i class="bi bi-chevron-right"></i></button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PDF_ID = '{{ doc.id }}';
+let questions = [];
+let currentQ = 0;
+let answers = {};
+let flagged = new Set();
+let totalQ = 0;
+let timerInterval = null;
+let timerSeconds = 900; // 15 min
+
+// Load MCQs
+fetch('/mcqs', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ pdf_id: PDF_ID, num_questions: 5 })
+})
+.then(r => r.json())
+.then(data => {
+  questions = data.mcqs || [];
+  totalQ = questions.length;
+  document.getElementById('totalQ').textContent = totalQ;
+  renderNav();
+  showQ(0);
+  startTimer();
+});
+
+function renderNav() {
+  const grid = document.getElementById('navGrid');
+  grid.innerHTML = '';
+  for (let i = 0; i < totalQ; i++) {
+    const btn = document.createElement('button');
+    btn.className = 'nav-btn' + (i === 0 ? ' current' : '');
+    btn.textContent = i + 1;
+    btn.onclick = () => { if (answers[currentQ] !== undefined) saveAnswer(); goToQ(i); };
+    grid.appendChild(btn);
+  }
+  updateStats();
+}
+
+function showQ(idx) {
+  currentQ = idx;
+  const q = questions[idx];
+  if (!q) return;
+  var topic = q.topic || q.source ? q.source.split(' ').slice(0,3).join(' ') : 'Document Concept';
+  document.getElementById('questionInner').innerHTML = `
+    <span class="q-badge">Q${idx + 1}</span>
+    <span class="q-badge" style="background:var(--success);margin-left:6px">${topic}</span>
+    <div class="q-text">${q.question}</div>
+    ${Object.entries(q.options).map(([key, val]) => `
+      <button class="option-btn ${answers[idx] === key ? 'selected' : ''}" onclick="selectOption('${key}')">
+        <span class="radio"></span>
+        <div><span class="opt-label">${key}.</span><span class="opt-text">${val}</span></div>
+      </button>
+    `).join('')}
+  `;
+  document.getElementById('quizProgress').style.width = ((Object.keys(answers).length) / totalQ * 100) + '%';
+  document.getElementById('qCounter').innerHTML = `Question ${idx + 1} of <span id="totalQ">${totalQ}</span>`;
+  
+  // Update nav
+  document.querySelectorAll('.nav-btn').forEach((b, i) => {
+    b.className = 'nav-btn';
+    if (i === idx) b.classList.add('current');
+    if (answers[i] !== undefined) b.classList.add('answered');
+    if (flagged.has(i)) b.classList.add('flagged');
+  });
+  
+  // Flag button
+  const fb = document.getElementById('flagBtn');
+  if (flagged.has(idx)) {
+    fb.innerHTML = '<i class="bi bi-flag-fill"></i> Unflag Question';
+    fb.classList.add('is-flagged');
+  } else {
+    fb.innerHTML = '<i class="bi bi-flag"></i> Flag for Review';
+    fb.classList.remove('is-flagged');
+  }
+  
+  // Next button
+  const nb = document.getElementById('nextBtn');
+  nb.innerHTML = idx < totalQ - 1 ? 'Next <i class="bi bi-chevron-right"></i>' : 'Submit <i class="bi bi-check"></i>';
+}
+
+function selectOption(key) {
+  answers[currentQ] = key;
+  document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelectorAll('.option-btn')[['A','B','C','D'].indexOf(key)].classList.add('selected');
+  document.querySelectorAll('.nav-btn').forEach((b, i) => {
+    if (i === currentQ) { b.classList.add('answered'); }
+  });
+  updateStats();
+}
+
+function saveAnswer() {
+  const sel = document.querySelector('.option-btn.selected');
+  if (sel) {
+    const key = sel.querySelector('.opt-label').textContent.replace('.','');
+    answers[currentQ] = key;
+  }
+}
+
+function goToQ(idx) {
+  if (idx < 0 || idx >= totalQ) return;
+  showQ(idx);
+}
+
+function prevQ() { goToQ(currentQ - 1); }
+
+function nextQ() {
+  if (currentQ < totalQ - 1) { goToQ(currentQ + 1); }
+  else submitQuiz();
+}
+
+function toggleFlag() {
+  if (flagged.has(currentQ)) flagged.delete(currentQ);
+  else flagged.add(currentQ);
+  showQ(currentQ);
+  updateStats();
+}
+
+function updateStats() {
+  document.getElementById('statAnswered').textContent = Object.keys(answers).length;
+  document.getElementById('statFlagged').textContent = flagged.size;
+  document.getElementById('statRemaining').textContent = totalQ - Object.keys(answers).length;
+}
+
+function startTimer() {
+  timerInterval = setInterval(() => {
+    timerSeconds--;
+    const m = Math.floor(timerSeconds / 60);
+    const s = timerSeconds % 60;
+    document.getElementById('timerDisplay').textContent = m + ':' + String(s).padStart(2, '0');
+    if (timerSeconds <= 0) { clearInterval(timerInterval); submitQuiz(); }
+  }, 1000);
+}
+
+function submitQuiz() {
+  clearInterval(timerInterval);
+  var durationSec = 900 - timerSeconds;
+  fetch('/quiz/submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pdf_id: PDF_ID, questions: questions, answers: answers, duration_seconds: durationSec })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    window.location.href = '/analytics-page';
+  });
+}
+</script>
+{% endblock %}

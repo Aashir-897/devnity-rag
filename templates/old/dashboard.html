@@ -1,0 +1,347 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<style>
+.page { height: 100vh; overflow-y: auto; }
+.page-inner { padding: 24px 32px; max-width: 1200px; }
+
+/* Header */
+.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+.page-header h1 { font-size: 20px; font-weight: 700; color: var(--text); }
+.page-header p { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.header-actions { display: flex; align-items: center; gap: 12px; }
+.search-box {
+  display: flex; align-items: center; gap: 8px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; width: 220px;
+}
+.search-box input {
+  border: none; background: none; outline: none; font-size: 13px;
+  font-family: inherit; color: var(--text); flex: 1; min-width: 0;
+}
+.search-box input::placeholder { color: var(--muted); }
+.search-box i { color: var(--muted); font-size: 13px; }
+.notif-btn {
+  width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface); display: flex; align-items: center; justify-content: center;
+  cursor: pointer; position: relative; color: var(--muted); font-size: 14px;
+}
+.notif-btn:hover { background: var(--bg); }
+.notif-dot {
+  position: absolute; top: 8px; right: 8px; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--success); border: 2px solid var(--surface);
+}
+
+/* Stats */
+.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+.stat-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 20px; display: flex; flex-direction: column;
+}
+.stat-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
+.stat-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+.stat-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+.stat-icon.purple { background: var(--accent-light); color: var(--accent); }
+.stat-icon.green { background: #ecfdf5; color: var(--success); }
+.stat-icon.amber { background: #fffbeb; color: var(--warning); }
+.stat-value { font-size: 28px; font-weight: 700; color: var(--text); }
+.stat-trend { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--success); margin-top: 6px; }
+.query-bars { display: flex; align-items: flex-end; gap: 2px; height: 36px; }
+.query-bar { width: 8px; border-radius: 2px; background: #c7d2fe; }
+
+/* Upload Zone */
+.upload-zone {
+  border: 2px dashed var(--border); border-radius: 12px; padding: 40px;
+  display: flex; flex-direction: column; align-items: center; cursor: pointer;
+  transition: all .15s; margin-bottom: 28px; background: var(--surface);
+}
+.upload-zone:hover, .upload-zone.drag-over { border-color: var(--accent); background: var(--accent-light); }
+.upload-icon {
+  width: 56px; height: 56px; border-radius: 16px; background: var(--accent-light);
+  display: flex; align-items: center; justify-content: center; margin-bottom: 16px;
+  font-size: 24px; color: var(--accent);
+}
+.upload-zone h3 { font-size: 15px; font-weight: 700; color: var(--text); }
+.upload-zone p { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.upload-btn {
+  margin-top: 16px; padding: 10px 24px; background: var(--accent); color: white;
+  border: none; border-radius: 8px; font-size: 13px; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: opacity .15s;
+}
+.upload-btn:hover { opacity: .9; }
+
+/* Docs Section */
+.docs-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.docs-header h2 { font-size: 14px; font-weight: 700; color: var(--text); }
+.docs-header a { font-size: 12px; font-weight: 600; color: var(--accent); text-decoration: none; display: flex; align-items: center; gap: 4px; }
+.docs-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.doc-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px; display: flex; flex-direction: column; transition: box-shadow .15s;
+}
+.doc-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.06); }
+.doc-card-top { display: flex; gap: 12px; margin-bottom: 12px; }
+.doc-pdf-icon {
+  width: 40px; height: 48px; background: #fef2f2; border: 1px solid #fecaca;
+  border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-size: 12px; color: var(--error); flex-shrink: 0;
+}
+.doc-pdf-icon span { font-size: 7px; font-weight: 700; margin-top: 2px; }
+.doc-info { min-width: 0; }
+.doc-title { font-size: 12px; font-weight: 600; color: var(--text); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.doc-meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.doc-status {
+  display: inline-block; font-size: 10px; font-weight: 700; padding: 3px 10px;
+  border-radius: 100px; border: 1px solid; margin-bottom: 12px; align-self: flex-start;
+}
+.doc-status.ready { background: #ecfdf5; color: #059669; border-color: #a7f3d0; }
+.doc-status.indexing { background: #fffbeb; color: #d97706; border-color: #fcd34d; }
+.doc-status.failed { background: #fef2f2; color: var(--error); border-color: #fecaca; }
+.doc-actions { display: flex; gap: 6px; margin-top: auto; }
+.doc-actions a, .doc-actions button {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px;
+  padding: 7px 0; border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer;
+  text-decoration: none; border: none; font-family: inherit; transition: all .12s;
+}
+.doc-actions .chat-btn { background: var(--accent); color: white; }
+.doc-actions .chat-btn:hover { opacity: .9; }
+.doc-actions .quiz-btn { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
+.doc-actions .quiz-btn:hover { background: var(--bg); }
+.doc-actions .del-btn { background: none; color: #fca5a5; border: 1px solid var(--border); padding: 7px 10px; flex: 0; }
+.doc-actions .del-btn:hover { background: #fef2f2; }
+
+/* Processing Overlay */
+.processing-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.5); backdrop-filter: blur(4px);
+  z-index: 200; display: none; align-items: center; justify-content: center;
+}
+.processing-overlay.visible { display: flex; }
+.processing-card {
+  background: var(--surface); border-radius: 16px; padding: 32px; width: 420px;
+  max-width: 90vw; box-shadow: 0 20px 60px rgba(0,0,0,.2); position: relative;
+}
+.processing-card .cancel-btn {
+  position: absolute; top: 12px; right: 16px; background: none; border: none;
+  font-size: 20px; cursor: pointer; color: var(--muted);
+}
+.proc-title { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.proc-filename { font-size: 12px; color: var(--muted); margin-bottom: 20px; word-break: break-all; }
+.progress-bar-bg { height: 6px; background: var(--bg); border-radius: 100px; overflow: hidden; margin-bottom: 6px; }
+.progress-bar-fill { height: 100%; background: var(--accent); border-radius: 100px; transition: width .3s; }
+.progress-pct { font-size: 11px; font-weight: 600; color: var(--muted); text-align: right; margin-bottom: 16px; }
+.step-list { display: flex; flex-direction: column; gap: 6px; }
+.step-item { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+.step-item.active { color: var(--text); font-weight: 600; }
+.step-item.done { color: var(--success); }
+.step-item.error { color: var(--error); }
+.step-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
+.step-item.active .step-dot { background: var(--accent); }
+.step-item.done .step-dot { background: var(--success); }
+.step-item.error .step-dot { background: var(--error); }
+.proc-msg { font-size: 12px; color: var(--muted); margin-top: 12px; text-align: center; }
+.proc-error { text-align: center; margin-top: 16px; }
+.proc-error p { color: var(--error); font-size: 13px; margin-bottom: 12px; }
+.empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+.empty-state i { font-size: 40px; margin-bottom: 12px; color: var(--border); }
+.empty-state h3 { font-size: 15px; font-weight: 600; color: var(--muted); }
+.empty-state p { font-size: 13px; margin-top: 4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+<div class="page-inner">
+  <div class="page-header">
+    <div>
+      <h1>Dashboard</h1>
+      <p>Welcome back, {{ current_user.email.split('@')[0] }} &mdash; ready to study?</p>
+    </div>
+    <div class="header-actions">
+      <div class="search-box">
+        <i class="bi bi-search"></i>
+        <input type="text" id="docSearch" placeholder="Search documents..." oninput="filterDocs(this.value)">
+      </div>
+      <button class="notif-btn"><i class="bi bi-bell"></i><span class="notif-dot"></span></button>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-header">
+        <span class="stat-label">Total Documents</span>
+        <div class="stat-icon purple"><i class="bi bi-file-text"></i></div>
+      </div>
+      <span class="stat-value">{{ total_docs }}</span>
+      <span class="stat-trend"><i class="bi bi-arrow-up"></i> Active documents</span>
+    </div>
+    <div class="stat-card">
+      <div class="stat-header">
+        <span class="stat-label">AI Queries Made</span>
+        <div class="stat-icon green">
+          <div class="query-bars" id="queryBars"></div>
+        </div>
+      </div>
+      <span class="stat-value">{{ total_chunks or 0 }}</span>
+      <span class="stat-trend"><i class="bi bi-arrow-up"></i> Total chunks indexed</span>
+    </div>
+    <div class="stat-card">
+      <div class="stat-header">
+        <span class="stat-label">Average Test Score</span>
+        <div class="stat-icon amber"><i class="bi bi-trophy"></i></div>
+      </div>
+      <span class="stat-value">--%</span>
+      <span class="stat-trend" style="color:var(--muted)">Take a quiz to see results</span>
+    </div>
+  </div>
+
+  <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+    <div class="upload-icon"><i class="bi bi-cloud-arrow-up"></i></div>
+    <h3>Drag &amp; drop your study material or PDF here</h3>
+    <p>Supports PDF &middot; Up to 30MB per file</p>
+    <button class="upload-btn" onclick="event.stopPropagation();document.getElementById('fileInput').click()">
+      <i class="bi bi-folder2-open"></i> Browse Files
+    </button>
+    <input type="file" id="fileInput" accept=".pdf" style="display:none" onchange="handleUpload(this.files[0])">
+  </div>
+
+  <div class="docs-header">
+    <h2>Recent Documents</h2>
+    <a href="{{ url_for('dashboard') }}" id="viewAllLink">View all <i class="bi bi-chevron-right"></i></a>
+  </div>
+
+  {% if documents %}
+  <div class="docs-grid" id="docsGrid">
+    {% for doc in documents %}
+    <div class="doc-card" data-name="{{ doc.original_name.lower() }}">
+      <div class="doc-card-top">
+        <div class="doc-pdf-icon"><i class="bi bi-filetype-pdf"></i><span>PDF</span></div>
+        <div class="doc-info">
+          <div class="doc-title">{{ doc.original_name }}</div>
+          <div class="doc-meta">{{ doc.created_at.strftime('%b %d, %Y') if doc.created_at else '' }} &middot; {{ doc.total_pages }} pages</div>
+        </div>
+      </div>
+      <span class="doc-status ready">Ready</span>
+      <div class="doc-actions">
+        <a href="{{ url_for('study_room', pdf_id=doc.id) }}" class="chat-btn"><i class="bi bi-chat-dots"></i> Open Chat</a>
+        <a href="{{ url_for('quiz_page', pdf_id=doc.id) }}" class="quiz-btn"><i class="bi bi-lightning"></i> Quiz</a>
+        <button class="del-btn" onclick="deleteDoc('{{ doc.id }}', event)"><i class="bi bi-trash"></i></button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-file-earmark-plus"></i>
+    <h3>No documents yet</h3>
+    <p>Upload your first PDF to get started!</p>
+  </div>
+  {% endif %}
+</div>
+</div>
+
+<!-- Processing Overlay -->
+<div class="processing-overlay" id="processingOverlay">
+  <div class="processing-card">
+    <button class="cancel-btn" onclick="closeProcessing()">&times;</button>
+    <div id="processingContent">
+      <div class="proc-title"><i class="bi bi-lightning" style="color:var(--warning)"></i> Processing PDF</div>
+      <div class="proc-filename" id="procFilename">---</div>
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressBar" style="width:0%"></div></div>
+      <div class="progress-pct" id="progressPct">0%</div>
+      <div class="step-list" id="stepList">
+        {% for s in ['Extracting','OCR','Images','Embeddings','Summary'] %}
+        <div class="step-item" data-step="{{ s }}"><span class="step-dot"></span> {{ s }}</div>
+        {% endfor %}
+      </div>
+      <div class="proc-msg" id="procMsg">Starting...</div>
+    </div>
+    <div class="proc-error" id="procError" style="display:none">
+      <p id="errorMsg"></p>
+      <button class="upload-btn" onclick="closeProcessing()">Dismiss</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentPdfId = null, eventSource = null;
+
+function filterDocs(q) {
+  q = q.toLowerCase();
+  document.querySelectorAll('.doc-card').forEach(c => {
+    c.style.display = c.dataset.name.includes(q) ? '' : 'none';
+  });
+}
+
+function handleUpload(file) {
+  if (!file || !file.name.endsWith('.pdf')) return showToast('Please select a PDF file.', 'error');
+  const form = new FormData();
+  form.append('pdf', file);
+  document.getElementById('procFilename').textContent = file.name;
+  document.getElementById('processingOverlay').classList.add('visible');
+  document.getElementById('procError').style.display = 'none';
+  document.getElementById('processingContent').style.display = 'block';
+  document.getElementById('progressBar').style.width = '0%';
+  document.getElementById('progressPct').textContent = '0%';
+  document.querySelectorAll('.step-item').forEach(el => el.className = 'step-item');
+  document.querySelector('.step-item').classList.add('active');
+
+  fetch('/upload', { method: 'POST', body: form })
+    .then(r => r.json())
+    .then(data => {
+      currentPdfId = data.pdf_id;
+      const evt = new EventSource('/progress/' + data.pdf_id);
+      eventSource = evt;
+      evt.onmessage = (e) => {
+        const d = JSON.parse(e.data);
+        if (!d || !d.step) return;
+        const pct = d.progress || 0;
+        document.getElementById('progressBar').style.width = pct + '%';
+        document.getElementById('progressPct').textContent = pct + '%';
+        document.getElementById('procMsg').textContent = d.message || d.step || '...';
+        const steps = ['Extracting','OCR','Images','Embeddings','Summary'];
+        const idx = steps.indexOf(d.step);
+        document.querySelectorAll('.step-item').forEach((el, i) => {
+          el.className = 'step-item';
+          if (i < idx) el.classList.add('done');
+          else if (i === idx) el.classList.add(d.error ? 'error' : 'active');
+        });
+        if (d.done) { evt.close(); window.location.href = '/study/' + data.pdf_id; }
+        if (d.error) {
+          evt.close();
+          document.getElementById('processingContent').style.display = 'none';
+          document.getElementById('procError').style.display = 'block';
+          document.getElementById('errorMsg').textContent = d.message || 'Error processing PDF';
+        }
+      };
+    })
+    .catch(e => {
+      document.getElementById('processingContent').style.display = 'none';
+      document.getElementById('procError').style.display = 'block';
+      document.getElementById('errorMsg').textContent = 'Upload failed';
+    });
+}
+
+function closeProcessing() {
+  document.getElementById('processingOverlay').classList.remove('visible');
+  if (eventSource) { eventSource.close(); eventSource = null; }
+}
+
+function deleteDoc(id, e) {
+  e.stopPropagation();
+  showConfirm('Delete this document permanently?', 'Delete Document').then(function(confirmed) {
+    if (!confirmed) return;
+    fetch('/pdf/' + id, { method: 'DELETE' }).then(function(r) { if (r.ok) location.reload(); });
+  });
+}
+
+// Drag-and-drop
+const zone = document.getElementById('uploadZone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f && f.name.endsWith('.pdf')) handleUpload(f);
+});
+</script>
+{% endblock %}

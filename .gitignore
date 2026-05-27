@@ -35,5 +35,6 @@ app_stderr.log
 app_stdout.log
 instance/
 
+*.log
 AGENTS.md
 setup.txt

@@ -3,7 +3,6 @@ import json
 import re
 import chromadb
 from sentence_transformers import SentenceTransformer
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from config import (
     EMBEDDING_MODEL, CHROMA_DB_PATH, CHROMA_COLLECTION,
     CHUNK_SIZE, CHUNK_OVERLAP
@@ -62,13 +61,30 @@ def _extract_page_lines(text: str) -> dict:
 # ── Text Chunking ─────────────────────────────────────────────────────────────
 
 def chunk_text(text: str) -> list[str]:
-    """Split text into chunks for embedding."""
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=CHUNK_SIZE,
-        chunk_overlap=CHUNK_OVERLAP,
-        separators=["\n\n", "\n", ". ", " ", ""]
-    )
-    chunks = splitter.split_text(text)
+    """Split text into chunks, always at paragraph boundaries (never mid-paragraph)."""
+    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+    if not paragraphs:
+        return []
+    chunks = []
+    current = []
+    current_len = 0
+    for para in paragraphs:
+        para_len = len(para)
+        if current_len + para_len > CHUNK_SIZE and current:
+            chunks.append("\n\n".join(current))
+            overlap = []
+            overlap_len = 0
+            for p in reversed(current):
+                if overlap_len + len(p) >= CHUNK_OVERLAP:
+                    break
+                overlap.insert(0, p)
+                overlap_len += len(p)
+            current = overlap
+            current_len = overlap_len
+        current.append(para)
+        current_len += para_len
+    if current:
+        chunks.append("\n\n".join(current))
     return [c.strip() for c in chunks if len(c.strip()) > 50]
 
 

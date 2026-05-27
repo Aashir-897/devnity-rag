@@ -1,5 +1,6 @@
 """SQLAlchemy models — User and Document."""
 import uuid
+from datetime import datetime, timedelta
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -10,10 +11,14 @@ db = SQLAlchemy()
 class User(UserMixin, db.Model):
     __tablename__ = "users"
 
-    id            = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    email         = db.Column(db.String(120), unique=True, nullable=False, index=True)
-    password_hash = db.Column(db.String(256), nullable=False)
-    created_at    = db.Column(db.DateTime, server_default=db.func.now())
+    id                  = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    email               = db.Column(db.String(120), unique=True, nullable=False, index=True)
+    password_hash       = db.Column(db.String(256), nullable=False)
+    is_verified         = db.Column(db.Boolean, default=False)
+    verification_token  = db.Column(db.String(100), nullable=True, index=True)
+    reset_token         = db.Column(db.String(100), nullable=True, index=True)
+    reset_token_expires = db.Column(db.DateTime, nullable=True)
+    created_at          = db.Column(db.DateTime, server_default=db.func.now())
 
     documents = db.relationship("Document", backref="owner", lazy="dynamic")
 

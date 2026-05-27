@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="auth-card">
+  <div class="auth-title">Check Your Inbox</div>
+  <p style="text-align:center;color:var(--muted);font-size:14px;margin-bottom:24px;line-height:1.6">
+    <i class="bi bi-envelope" style="font-size:32px;color:var(--accent);display:block;margin-bottom:12px"></i>
+    We've sent an email with instructions.<br>Please check your inbox and follow the link.
+  </p>
+  <div style="text-align:center">
+    <a href="{{ url_for('auth.login') }}" class="btn btn-primary" style="display:inline-block;width:auto;padding:10px 24px;text-decoration:none">Back to Login</a>
+  </div>
+</div>
+{% endblock %}

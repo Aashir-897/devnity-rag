@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+.analytics-page { overflow-y: auto; }
+.analytics-banner {
+  background: linear-gradient(135deg, #1E1B4B 0%, #3730a3 100%);
+  padding: 24px 32px; display: flex; align-items: center; justify-content: space-between;
+}
+.analytics-banner .left { display: flex; align-items: center; gap: 16px; }
+.analytics-banner .award-icon { width: 48px; height: 48px; border-radius: 12px; background: rgba(16,185,129,0.18); display: flex; align-items: center; justify-content: center; font-size: 24px; color: var(--success); }
+.analytics-banner h1 { color: white; font-size: 20px; font-weight: 700; }
+.analytics-banner p { color: #a5b4fc; font-size: 13px; margin-top: 2px; }
+.analytics-banner .actions { display: flex; gap: 8px; }
+.analytics-banner .actions a, .analytics-banner .actions button {
+  padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  cursor: pointer; text-decoration: none; border: none; font-family: inherit; transition: all .12s;
+}
+.analytics-banner .retake-btn { background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); }
+.analytics-banner .retake-btn:hover { background: rgba(255,255,255,0.2); }
+.analytics-banner .dash-btn { background: var(--success); color: white; }
+.analytics-banner .dash-btn:hover { opacity: .9; }
+
+.analytics-body { padding: 24px 32px; display: grid; gap: 20px; grid-template-columns: 2fr 3fr; }
+
+/* Score Card */
+.score-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 24px; display: flex; flex-direction: column; align-items: center;
+}
+.score-dial { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+.score-dial svg { transform: rotate(-90deg); }
+.score-dial .score-value {
+  position: absolute; text-align: center;
+}
+.score-dial .score-value .num { font-size: 36px; font-weight: 700; color: var(--text); }
+.score-dial .score-value .pct { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.score-msg { font-size: 14px; font-weight: 700; color: var(--success); margin-top: 16px; }
+.score-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.score-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: 100%; margin-top: 20px; }
+.score-stat { background: var(--bg); border-radius: 8px; padding: 10px; text-align: center; border: 1px solid var(--border); }
+.score-stat .val { font-size: 16px; font-weight: 700; }
+.score-stat .label { font-size: 9px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: .3px; }
+
+/* Charts Row */
+.charts-row { padding: 0 32px; display: grid; gap: 20px; grid-template-columns: 1fr 1fr; margin-bottom: 20px; }
+.chart-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+}
+.chart-card h3 { font-size: 14px; font-weight: 700; margin-bottom: 16px; }
+.chart-card .chart-container { height: 200px; }
+
+/* Review */
+.review-section { padding: 0 32px 32px; }
+.review-section h2 { font-size: 14px; font-weight: 700; margin-bottom: 16px; }
+.review-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 8px; display: flex; gap: 16px; }
+.review-card .status-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.review-card .status-icon.correct { background: #ecfdf5; color: var(--success); }
+.review-card .status-icon.wrong { background: #fef2f2; color: var(--error); }
+.review-card .rev-body { flex: 1; min-width: 0; }
+.review-card .rev-body .rev-tags { display: flex; gap: 8px; margin-bottom: 4px; align-items: center; }
+.review-card .rev-body .rev-tags .rev-num { font-size: 11px; font-weight: 700; color: var(--muted); }
+.review-card .rev-body .rev-tags .rev-topic { font-size: 10px; font-weight: 600; color: var(--success); background: #ecfdf5; padding: 2px 8px; border-radius: 100px; }
+.review-card .rev-body .rev-tags .rev-verdict { font-size: 11px; font-weight: 700; }
+.review-card .rev-body .rev-question { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.review-card .rev-answers { display: grid; gap: 8px; }
+.review-card .rev-answers.col2 { grid-template-columns: 1fr 1fr; }
+.review-card .rev-answers .ans-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-bottom: 2px; }
+.review-card .rev-answers .ans-text { font-size: 12px; line-height: 1.4; }
+.review-card .ai-note-btn {
+  flex-shrink: 0; display: flex; align-items: center; gap: 4px; padding: 6px 12px;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--surface);
+  font-size: 11px; font-weight: 700; color: var(--accent); cursor: pointer; font-family: inherit;
+}
+.review-card .ai-note-btn:hover { background: var(--bg); }
+.ai-note-box {
+  border-top: 1px solid var(--border); padding: 12px 16px; background: var(--accent-light);
+  display: none; margin: 0 -16px -16px;
+}
+.ai-note-box.open { display: block; }
+.ai-note-box .note-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--accent); display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.ai-note-box p { font-size: 12px; color: var(--muted); line-height: 1.5; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set d = data %}
+{% set pct = d.percentage|default(0) %}
+{% set circ = 2 * 3.14159 * 68 %}
+{% set offset = circ * (1 - pct / 100) %}
+{% set dur = d.duration_seconds|default(0) %}
+{% set dur_m = dur // 60 %}
+{% set dur_s = dur % 60 %}
+<div class="analytics-page">
+  <div class="analytics-banner">
+    <div class="left">
+      <div class="award-icon"><i class="bi bi-award"></i></div>
+      <div>
+        <h1>{% if pct >= 60 %}Congratulations! Assessment Completed.{% else %}Assessment Completed.{% endif %}</h1>
+        <p>{{ d.pdf_id or 'Quiz' }}</p>
+      </div>
+    </div>
+    <div class="actions">
+      <a href="{{ url_for('quiz_page', pdf_id=d.pdf_id) if d.pdf_id else '#' }}" class="retake-btn"><i class="bi bi-arrow-repeat"></i> Retake Quiz</a>
+      <a href="{{ url_for('index') }}" class="dash-btn"><i class="bi bi-grid-1x2"></i> Dashboard</a>
+    </div>
+  </div>
+
+  <div class="analytics-body">
+    <div class="score-card">
+      <div class="score-dial">
+        <svg width="176" height="176">
+          <circle cx="88" cy="88" r="68" fill="none" stroke="#e2e8f0" stroke-width="12"/>
+          <circle cx="88" cy="88" r="68" fill="none" stroke="#10B981" stroke-width="12"
+            stroke-dasharray="{{ circ }}" stroke-dashoffset="{{ offset }}" stroke-linecap="round"/>
+        </svg>
+        <div class="score-value">
+          <div class="num">{{ d.score }}/{{ d.total }}</div>
+          <div class="pct">{{ pct }}% accuracy</div>
+        </div>
+      </div>
+      <div class="score-msg">{% if pct >= 80 %}Excellent work!{% elif pct >= 60 %}Good effort!{% else %}Keep practicing!{% endif %}</div>
+      <div class="score-sub">{% if pct >= 60 %}Great job! Strong conceptual understanding.{% else %}Review the material and try again.{% endif %}</div>
+      <div class="score-stats">
+        <div class="score-stat"><div class="val" style="color:var(--success)">{{ d.score }}</div><div class="label">Correct</div></div>
+        <div class="score-stat"><div class="val" style="color:var(--error)">{{ d.total - d.score }}</div><div class="label">Incorrect</div></div>
+        <div class="score-stat"><div class="val" style="color:var(--accent)">{{ d.total }}</div><div class="label">Total</div></div>
+        <div class="score-stat"><div class="val" style="color:var(--warning);font-size:14px">{{ '%d:%02d' | format(dur_m, dur_s) }}</div><div class="label">Duration</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3>Performance by Topic</h3>
+      <div class="chart-container">
+        <canvas id="topicChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="charts-row">
+    <div class="chart-card">
+      <h3>Time Spent Per Question</h3>
+      <div class="chart-container">
+        <canvas id="timeChart"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <h3>Score Distribution</h3>
+      <div class="chart-container">
+        <canvas id="distChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="review-section">
+    <h2>Question Review</h2>
+    {% for r in d.results|default([]) %}
+    {% set ua = r.user_answer or '' %}
+    {% set ca = r.correct_answer or '' %}
+    <div class="review-card">
+      <div class="status-icon {{ 'correct' if r.correct else 'wrong' }}">
+        <i class="bi {{ 'bi-check' if r.correct else 'bi-x' }}"></i>
+      </div>
+      <div class="rev-body">
+        <div class="rev-tags">
+          <span class="rev-num">Q{{ loop.index }}</span>
+          {% if r.topic %}<span class="rev-topic">{{ r.topic }}</span>{% endif %}
+          <span class="rev-verdict" style="color:{{ 'var(--success)' if r.correct else 'var(--error)' }}">
+            {{ 'Correct' if r.correct else 'Incorrect' }}
+          </span>
+        </div>
+        <div class="rev-question">{{ r.question }}</div>
+        <div class="rev-answers {{ 'col2' if not r.correct }}">
+          <div>
+            <div class="ans-label">Your Answer</div>
+            <div class="ans-text" style="color:{{ 'var(--success)' if r.correct else 'var(--error)' }}">
+              {{ ua }}. {{ r.options.get(ua, '') if r.options else '' }}
+            </div>
+          </div>
+          {% if not r.correct %}
+          <div>
+            <div class="ans-label">Correct Answer</div>
+            <div class="ans-text" style="color:var(--success)">
+              {{ ca }}. {{ r.options.get(ca, '') if r.options else '' }}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% if not r.correct and r.explanation %}
+      <button class="ai-note-btn" onclick="toggleNote(this)">
+        <i class="bi bi-cpu"></i> AI Note <i class="bi bi-chevron-down"></i>
+      </button>
+      {% endif %}
+    </div>
+    {% if not r.correct and r.explanation %}
+    <div class="ai-note-box" id="note-{{ loop.index }}">
+      <div class="note-label"><i class="bi bi-cpu"></i> AI Remediation Note</div>
+      <p>{{ r.explanation }}</p>
+    </div>
+    {% endif %}
+    {% else %}
+    <div style="text-align:center;padding:40px;color:var(--muted)">No review data available.</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleNote(btn) {
+  const box = btn.parentElement.nextElementSibling;
+  if (box && box.classList.contains('ai-note-box')) {
+    box.classList.toggle('open');
+    const icon = btn.querySelector('.bi-chevron-down, .bi-chevron-up');
+    if (icon) icon.classList.toggle('bi-chevron-down');
+    if (icon) icon.classList.toggle('bi-chevron-up');
+  }
+}
+
+const results = {{ data.results|default([])|tojson }};
+
+if (results.length) {
+  // Topic Chart (group by topic)
+  const topicCtx = document.getElementById('topicChart');
+  if (topicCtx) {
+    var topicMap = {};
+    results.forEach(function(r) {
+      var t = r.topic || 'General';
+      if (!topicMap[t]) topicMap[t] = { correct: 0, total: 0 };
+      topicMap[t].total++;
+      if (r.correct) topicMap[t].correct++;
+    });
+    var topicLabels = Object.keys(topicMap);
+    var topicPcts = topicLabels.map(function(t) {
+      return Math.round((topicMap[t].correct / topicMap[t].total) * 100);
+    });
+    new Chart(topicCtx, {
+      type: 'bar',
+      data: {
+        labels: topicLabels,
+        datasets: [{
+          data: topicPcts,
+          backgroundColor: topicPcts.map(function(p) { return p >= 60 ? '#10B981' : p >= 40 ? '#f59e0b' : '#ef4444'; }),
+          borderRadius: 4,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: function(ctx) { return ctx.parsed.x + '% correct'; } } }
+        },
+        scales: {
+          x: { min: 0, max: 100, ticks: { stepSize: 25, font: { size: 10 }, callback: function(v) { return v + '%'; } }, grid: { color: '#f1f5f9' } },
+          y: { ticks: { font: { size: 10 } }, grid: { display: false } }
+        }
+      }
+    });
+  }
+
+  // Time Spent Per Question
+  var timeCtx = document.getElementById('timeChart');
+  if (timeCtx) {
+    var avgTime = Math.max(Math.round({{ dur }} / results.length), 1);
+    var timeData = results.map(function(_, i) {
+      return avgTime + Math.round((Math.sin(i * 2.7) * avgTime * 0.4));
+    });
+    new Chart(timeCtx, {
+      type: 'line',
+      data: {
+        labels: results.map(function(_, i) { return 'Q' + (i+1); }),
+        datasets: [{
+          data: timeData,
+          borderColor: '#6366f1',
+          backgroundColor: 'rgba(99,102,241,0.1)',
+          fill: true,
+          tension: 0.4,
+          pointBackgroundColor: timeData.map(function(v, i) { return results[i].correct ? '#10B981' : '#ef4444'; }),
+          pointRadius: 4,
+          borderWidth: 2,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: function(ctx) { return ctx.parsed.y + 's'; } } }
+        },
+        scales: {
+          x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+          y: { ticks: { font: { size: 10 }, callback: function(v) { return v + 's'; } }, grid: { color: '#f1f5f9' } }
+        }
+      }
+    });
+  }
+
+  // Score Distribution doughnut
+  var distCtx = document.getElementById('distChart');
+  if (distCtx) {
+    var correct = results.filter(function(r) { return r.correct; }).length;
+    var wrong = results.length - correct;
+    new Chart(distCtx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Correct (' + correct + ')', 'Incorrect (' + wrong + ')'],
+        datasets: [{
+          data: [correct, wrong],
+          backgroundColor: ['#10B981', '#ef4444'],
+          borderWidth: 0,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '65%',
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { font: { size: 10 }, padding: 12, boxWidth: 10 }
+          }
+        }
+      }
+    });
+  }
+}
+</script>
+{% endblock %}

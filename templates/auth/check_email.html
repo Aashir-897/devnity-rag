@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% set is_auth_page = true %}
+
+{% block title %}Check Email - Devnity AI{% endblock %}
+
+{% block content %}
+<div class="auth-logo">
+    <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="Devnity AI">
+    <p class="auth-logo-text">PDF Intelligence</p>
+</div>
+
+<div class="auth-card" style="text-align: center;">
+    <div style="width: 64px; height: 64px; background: var(--accent-light); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
+        <i class="bi bi-envelope-check" style="font-size: 2rem; color: var(--accent);"></i>
+    </div>
+    <h1 class="auth-title">Check your email</h1>
+    <p class="auth-subtitle" style="margin-bottom: 1.5rem;">
+        We've sent a confirmation link to your email address. Click the link to verify your account.
+    </p>
+    <p style="font-size: 0.8125rem; color: var(--muted); margin-bottom: 1.5rem;">
+        Didn't receive the email? Check your spam folder or contact support.
+    </p>
+    <a href="{{ url_for('auth.login') }}" class="btn btn-primary">
+        Back to sign in
+    </a>
+</div>
+{% endblock %}

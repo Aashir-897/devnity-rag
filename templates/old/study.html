@@ -1,0 +1,545 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<style>
+.study-layout { display: flex; height: calc(100vh - 0px); overflow: hidden; }
+
+/* TOC Sidebar */
+.toc-panel {
+  width: 220px; background: var(--surface); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;
+}
+.toc-header { padding: 16px; border-bottom: 1px solid var(--border); }
+.toc-header h4 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 10px; }
+.toc-info { display: flex; justify-content: space-between; font-size: 11px; padding: 2px 0; }
+.toc-info span:first-child { color: var(--muted); }
+.toc-info span:last-child { font-weight: 600; color: var(--text); }
+.toc-list { flex: 1; overflow-y: auto; padding: 8px; }
+.toc-item {
+  width: 100%; text-align: left; background: none; border: none;
+  padding: 8px 10px; border-radius: 8px; cursor: pointer; font-family: inherit;
+  display: flex; gap: 8px; margin-bottom: 4px; transition: all .12s;
+}
+.toc-item:hover { background: var(--bg); }
+.toc-item.active { background: var(--accent-light); }
+.toc-item .toc-num { font-size: 11px; font-weight: 700; color: var(--border); margin-top: 1px; flex-shrink: 0; }
+.toc-item.active .toc-num { color: var(--accent); }
+.toc-item .toc-title { font-size: 11px; color: var(--muted); line-height: 1.3; }
+.toc-item.active .toc-title { font-weight: 600; color: var(--accent); }
+.toc-item .toc-pages { font-size: 10px; color: var(--border); display: block; margin-top: 1px; }
+
+/* Center Content */
+.center-panel { flex: 1; background: var(--bg); display: flex; flex-direction: column; overflow: hidden; }
+.study-topbar {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 10px 20px; display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+}
+.study-topbar a { color: var(--muted); text-decoration: none; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.study-topbar a:hover { color: var(--text); }
+.study-topbar .sep { width: 1px; height: 16px; background: var(--border); }
+.study-topbar .doc-name { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.study-topbar .gen-quiz-btn {
+  margin-left: auto; padding: 8px 16px; background: var(--accent); color: white;
+  border: none; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; gap: 6px; font-family: inherit;
+}
+.study-topbar .gen-quiz-btn:hover { opacity: .9; }
+
+/* Tabs */
+.tab-bar {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  display: flex; padding: 0 20px; flex-shrink: 0;
+}
+.tab-btn {
+  padding: 12px 20px; font-size: 13px; font-weight: 600; color: var(--muted);
+  border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent;
+  font-family: inherit; transition: all .12s;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.tab-content { flex: 1; overflow-y: auto; padding: 24px; }
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+/* Summary */
+.summary-section { max-width: 640px; }
+.summary-section h2 { font-size: 18px; font-weight: 700; margin-bottom: 2px; }
+.summary-section .sub { font-size: 12px; color: var(--muted); margin-bottom: 20px; }
+.summary-point { display: flex; gap: 12px; margin-bottom: 16px; }
+.summary-point .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-top: 8px; flex-shrink: 0; }
+.summary-point p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+.def-box {
+  background: var(--accent-light); border: 1px solid #c7d2fe; border-radius: 12px; padding: 16px; margin-top: 20px;
+}
+.def-box .def-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--accent); display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.def-box h4 { font-size: 14px; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+.def-box p { font-size: 13px; color: #4338ca; line-height: 1.5; }
+
+/* Terminology */
+.term-section { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-top: 20px; }
+.term-toggle {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; background: var(--surface); border: none; cursor: pointer;
+  font-family: inherit; font-size: 13px; font-weight: 700; color: var(--text);
+}
+.term-toggle:hover { background: var(--bg); }
+.term-body { border-top: 1px solid var(--border); padding: 12px 16px; display: none; }
+.term-body.open { display: block; }
+.term-item { margin-bottom: 12px; }
+.term-item:last-child { margin-bottom: 0; }
+.term-item h5 { font-size: 13px; font-weight: 700; color: var(--text); }
+.term-item p { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.5; }
+
+/* Takeaways */
+.takeaway-grid { max-width: 640px; }
+.takeaway-card {
+  display: flex; gap: 16px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 16px; margin-bottom: 12px;
+}
+.takeaway-card .tk-icon { font-size: 20px; width: 32px; text-align: center; flex-shrink: 0; margin-top: 2px; color: var(--accent); }
+.takeaway-card h4 { font-size: 14px; font-weight: 700; }
+.takeaway-card p { font-size: 13px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+
+/* Q&A Section */
+.qa-section { margin-top: 24px; max-width: 640px; }
+.qa-section h3 { font-size: 14px; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.qa-controls { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.qa-controls input[type=number] {
+  width: 60px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 13px; text-align: center; font-family: inherit; background: var(--surface); color: var(--text);
+}
+.qa-controls .qa-gen-btn {
+  padding: 6px 14px; background: var(--accent); color: white; border: none;
+  border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit;
+}
+.qa-controls .qa-gen-btn:disabled { opacity: .5; cursor: not-allowed; }
+.qa-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px; margin-bottom: 8px;
+}
+.qa-card .q-text { font-size: 13px; font-weight: 700; color: var(--accent); display: flex; align-items: flex-start; gap: 8px; }
+.qa-card .q-text i { margin-top: 2px; }
+.qa-card .a-text { font-size: 13px; color: var(--muted); margin-top: 6px; line-height: 1.5; padding-left: 24px; }
+.qa-card .qa-source { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border); }
+.qa-card .qa-source button {
+  font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px;
+  background: var(--accent-light); color: var(--accent); cursor: pointer; border: none; font-family: inherit;
+}
+
+/* Document View */
+.doc-view-placeholder {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 60px; text-align: center; color: var(--muted);
+}
+.doc-view-placeholder i { font-size: 40px; color: var(--border); margin-bottom: 12px; }
+.doc-view-placeholder p { font-size: 14px; }
+
+/* Chat Panel */
+.chat-panel {
+  width: 320px; background: var(--surface); border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; flex-shrink: 0;
+}
+.chat-header { padding: 16px; border-bottom: 1px solid var(--border); }
+.chat-header .chat-ai-name { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.chat-header .chat-status { font-size: 11px; font-weight: 600; color: var(--success); display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+.chat-header .chat-status .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+.chat-messages { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+.chat-msg { max-width: 88%; }
+.chat-msg.user { align-self: flex-end; }
+.chat-msg.user .bubble { background: var(--accent); color: white; border-radius: 16px 16px 4px 16px; padding: 10px 14px; }
+.chat-msg.ai { align-self: flex-start; }
+.chat-msg.ai .bubble { background: var(--bg); border: 1px solid var(--border); border-radius: 16px 16px 16px 4px; padding: 12px 14px; }
+.chat-msg.ai .bubble p { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.chat-msg.ai .sources { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.chat-msg.ai .source-pill {
+  font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 4px;
+  background: var(--accent-light); color: var(--accent); cursor: pointer; border: none; font-family: inherit;
+}
+.chat-msg.ai .source-pill:hover { opacity: .8; }
+.chat-input-area { padding: 12px; border-top: 1px solid var(--border); }
+.chat-input-wrap {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px;
+}
+.chat-input-wrap input {
+  width: 100%; border: none; background: none; outline: none; font-size: 13px;
+  font-family: inherit; color: var(--text);
+}
+.chat-input-wrap input::placeholder { color: var(--muted); }
+.chat-input-tools { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
+.chat-input-tools .left { display: flex; gap: 2px; }
+.chat-input-tools .left button { background: none; border: none; padding: 6px; cursor: pointer; color: var(--muted); border-radius: 6px; }
+.chat-input-tools .left button:hover { background: var(--border); }
+.chat-send-btn {
+  width: 28px; height: 28px; border-radius: 6px; background: var(--accent); color: white;
+  border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.chat-send-btn:hover { opacity: .9; }
+.chat-empty { text-align: center; padding: 40px 16px; color: var(--muted); font-size: 13px; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set chapter_size = 15 %}
+{% set num_chapters = (doc.total_pages // chapter_size) + (1 if doc.total_pages % chapter_size > 0 else 0) %}
+{% set summary_paragraphs = doc.summary.split('\n') if doc.summary else [] %}
+<div class="study-layout">
+  <!-- TOC -->
+  <div class="toc-panel">
+    <div class="toc-header">
+      <h4>Document Info</h4>
+      <div class="toc-info"><span>Pages</span><span>{{ doc.total_pages }}</span></div>
+      <div class="toc-info"><span>Chapters</span><span>{{ num_chapters }}</span></div>
+      <div class="toc-info"><span>Uploaded</span><span>{{ doc.created_at.strftime('%b %d') if doc.created_at else '---' }}</span></div>
+      <div class="toc-info"><span>Language</span><span>English</span></div>
+    </div>
+    <div class="toc-list">
+      {% for ch in range(num_chapters) %}
+      {% set start = ch * chapter_size + 1 %}
+      {% set end = [((ch + 1) * chapter_size), doc.total_pages] | min %}
+      <button class="toc-item {% if ch == 0 %}active{% endif %}" onclick="setActiveChapter(this);scrollToPage({{ start }})">
+        <span class="toc-num">{{ '%02d' % (ch + 1) }}</span>
+        <div>
+          <div class="toc-title">Chapter {{ ch + 1 }}</div>
+          <span class="toc-pages">Pages {{ start }}{% if end > start %}-{{ end }}{% endif %}</span>
+        </div>
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Center -->
+  <div class="center-panel">
+    <div class="study-topbar">
+      <a href="{{ url_for('index') }}"><i class="bi bi-arrow-left"></i> Back</a>
+      <span class="sep"></span>
+      <span class="doc-name"><i class="bi bi-filetype-pdf" style="color:#f87171;margin-right:8px"></i>{{ doc.original_name }}</span>
+      <a href="{{ url_for('quiz_page', pdf_id=doc.id) }}" class="gen-quiz-btn"><i class="bi bi-lightning"></i> Generate Quiz</a>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab(this, 'summary')">AI Generated Summary</button>
+      <button class="tab-btn" onclick="switchTab(this, 'view')">Document View</button>
+      <button class="tab-btn" onclick="switchTab(this, 'takeaways')">Key Takeaways</button>
+    </div>
+
+    <div class="tab-content">
+      <!-- Summary Tab -->
+      <div class="tab-pane active" id="tab-summary">
+        <div class="summary-section">
+          <h2>{{ doc.original_name }}</h2>
+          <p class="sub">Auto-generated by Devnity AI</p>
+          {% if summary_paragraphs %}
+            {% for para in summary_paragraphs if para.strip() %}
+            <div class="summary-point"><span class="dot"></span><p>{{ para }}</p></div>
+            {% endfor %}
+          {% else %}
+          <div class="summary-point"><span class="dot"></span><p>No summary available yet.</p></div>
+          {% endif %}
+        </div>
+
+        <!-- Key Terminology Dictionary -->
+        <div class="term-section">
+          <button class="term-toggle" onclick="toggleTerms()">
+            <span><i class="bi bi-book" style="margin-right:6px;color:var(--accent)"></i> Key Terminology Dictionary</span>
+            <i class="bi bi-chevron-down"></i>
+          </button>
+          <div class="term-body" id="termBody">
+            <div id="termsContainer">
+              <div style="text-align:center;padding:16px;color:var(--muted);font-size:12px">
+                <i class="bi bi-arrow-clockwise bi-spin"></i> Extracting key terms...
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Q&A Section -->
+        <div class="qa-section">
+          <h3><i class="bi bi-question-circle" style="color:var(--accent)"></i> Q&A Pairs</h3>
+          <div class="qa-controls">
+            <span style="font-size:12px;color:var(--muted)">Generate</span>
+            <input type="number" id="qaCount" value="5" min="1" max="15">
+            <span style="font-size:12px;color:var(--muted)">pairs</span>
+            <button class="qa-gen-btn" id="qaBtn" onclick="generateQA()"><i class="bi bi-wand"></i> Generate Q&A</button>
+          </div>
+          <div id="qaContainer">
+            <div style="padding:24px;text-align:center;color:var(--muted);font-size:13px">
+              <i class="bi bi-lightbulb" style="font-size:20px;color:var(--border);display:block;margin-bottom:8px"></i>
+              Click "Generate Q&A" to create question-answer pairs from this document.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- View Tab -->
+      <div class="tab-pane" id="tab-view">
+        <div class="doc-view-placeholder" id="pdfViewerPlaceholder">
+          <i class="bi bi-filetype-pdf" style="font-size:40px;color:var(--border);display:block;margin-bottom:12px"></i>
+          <p>Loading PDF viewer...</p>
+        </div>
+        <div id="pdfPages" style="display:none"></div>
+      </div>
+
+      <!-- Key Takeaways Tab -->
+      <div class="tab-pane" id="tab-takeaways">
+        <div class="takeaway-grid">
+          <h2 style="font-size:16px;font-weight:700;margin-bottom:16px">Key Insights from This Document</h2>
+          <div id="takeawaysContainer">
+            {% set takeaway_icons = ['bi-bullseye', 'bi-lightning', 'bi-plug', 'bi-bar-chart'] %}
+            {% for i in range(4) %}
+            <div class="takeaway-card">
+              <div class="tk-icon"><i class="bi {{ takeaway_icons[i] }}"></i></div>
+              <div>
+                <h4>Key Insight {{ i + 1 }}</h4>
+                <p>{{ takeaway_paras[i] if takeaway_paras|length > i else 'AI-generated insight from document analysis will appear here.' }}</p>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chat Panel -->
+  <div class="chat-panel">
+    <div class="chat-header">
+      <div class="chat-ai-name"><i class="bi bi-cpu" style="color:var(--accent)"></i> Devnity AI</div>
+      <div class="chat-status"><span class="dot"></span> Online &middot; Context loaded</div>
+    </div>
+    <div class="chat-messages" id="chatMessages">
+      <div class="chat-empty">Ask anything about this document...</div>
+    </div>
+    <div class="chat-input-area">
+      <div class="chat-input-wrap">
+        <input type="text" id="chatInput" placeholder="Ask anything about this document..."
+               onkeydown="if(event.key==='Enter') sendChat()">
+        <div class="chat-input-tools">
+          <div class="left">
+            <button title="Attach"><i class="bi bi-paperclip"></i></button>
+          </div>
+          <button class="chat-send-btn" onclick="sendChat()"><i class="bi bi-send"></i></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const PDF_ID = '{{ doc.id }}';
+let pdfViewer = null;
+let pdfScale = 1.5;
+let linesData = {};
+
+// Tabs
+function switchTab(btn, tabId) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + tabId).classList.add('active');
+  if (tabId === 'view') loadPDFViewer();
+}
+
+// TOC
+function setActiveChapter(el) {
+  document.querySelectorAll('.toc-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// PDF Viewer
+let pdfLoaded = false;
+function loadPDFViewer() {
+  if (pdfLoaded) return;
+  pdfLoaded = true;
+  fetch('/pdf/' + PDF_ID + '/file')
+    .then(r => {
+      if (r.redirected) return r.url;
+      return r.url;
+    })
+    .then(url => {
+      return pdfjsLib.getDocument(url).promise;
+    })
+    .then(pdf => {
+      pdfViewer = pdf;
+      document.getElementById('pdfViewerPlaceholder').style.display = 'none';
+      const container = document.getElementById('pdfPages');
+      container.style.display = 'block';
+      for (let i = 1; i <= pdf.numPages; i++) renderPage(i, container);
+      return fetch('/pdf/' + PDF_ID + '/lines');
+    })
+    .then(r => r.json())
+    .then(d => { linesData = d; })
+    .catch(e => console.error('PDF load error:', e));
+}
+
+function renderPage(num, container) {
+  pdfViewer.getPage(num).then(page => {
+    const viewport = page.getViewport({ scale: pdfScale });
+    const wrapper = document.createElement('div');
+    wrapper.className = 'pdf-page-wrapper';
+    wrapper.id = 'pdf-page-' + num;
+    wrapper.style.cssText = 'width:' + viewport.width + 'px;margin:0 auto 12px;background:white;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden';
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    wrapper.appendChild(canvas);
+    container.appendChild(wrapper);
+    page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport });
+  });
+}
+
+// Chat
+function addChatMsg(role, content, sources) {
+  const container = document.getElementById('chatMessages');
+  container.querySelector('.chat-empty')?.remove();
+  const div = document.createElement('div');
+  div.className = 'chat-msg ' + role;
+  let html = '<div class="bubble"><p>' + content.replace(/\n/g, '<br>') + '</p>';
+  if (sources && sources.length) {
+    html += '<div class="sources">';
+    sources.forEach(s => {
+      html += '<button class="source-pill" onclick="scrollToPage(' + (s.pages?.[0] || 1) + ')">p.' + (s.pages?.[0] || '?') + '</button>';
+    });
+    html += '</div>';
+  }
+  html += '</div>';
+  div.innerHTML = html;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function sendChat() {
+  const input = document.getElementById('chatInput');
+  const q = input.value.trim();
+  if (!q) return;
+  addChatMsg('user', q);
+  input.value = '';
+  addChatMsg('ai', 'Thinking...');
+  fetch('/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pdf_id: PDF_ID, question: q })
+  })
+    .then(r => r.json())
+    .then(data => {
+      document.querySelector('.chat-msg.ai:last-child')?.remove();
+      if (data.answer) addChatMsg('ai', data.answer, data.sources || []);
+      else addChatMsg('ai', 'Sorry, I could not find an answer.');
+    })
+    .catch(() => {
+      document.querySelector('.chat-msg.ai:last-child')?.remove();
+      addChatMsg('ai', 'Error connecting to AI. Please try again.');
+    });
+}
+
+function scrollToPage(pageNum) {
+  const el = document.getElementById('pdf-page-' + pageNum);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  switchTab(document.querySelectorAll('.tab-btn')[1], 'view');
+}
+
+// Terminology Dictionary
+function toggleTerms() {
+  const body = document.getElementById('termBody');
+  body.classList.toggle('open');
+  const icon = body.previousElementSibling.querySelector('.bi-chevron-down, .bi-chevron-up');
+  if (icon) icon.classList.toggle('bi-chevron-down');
+  if (icon) icon.classList.toggle('bi-chevron-up');
+  if (body.classList.contains('open') && !body.dataset.loaded) {
+    body.dataset.loaded = '1';
+    generateTerms();
+  }
+}
+
+function generateTerms() {
+  fetch('/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      pdf_id: PDF_ID,
+      question: 'Extract 4-6 key technical terms from this document as a raw JSON array only. Each object must have "term" and "definition". Return ONLY the JSON array starting with [ and ending with ], no other text.'
+    })
+  })
+    .then(r => r.json())
+    .then(data => {
+      const container = document.getElementById('termsContainer');
+      if (!data.answer) {
+        container.innerHTML = '<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px">Could not extract terms.</div>';
+        return;
+      }
+      // Extract JSON array from LLM response
+      var raw = data.answer;
+      var start = raw.indexOf('[');
+      var end = raw.lastIndexOf(']');
+      if (start === -1 || end === -1) {
+        container.innerHTML = '<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px">Could not parse terms from response.</div>';
+        return;
+      }
+      raw = raw.substring(start, end + 1);
+      // Fix malformed JSON: collapse newlines inside objects, separate adjacent objects
+      raw = raw.replace(/}\s*{/g, '},{');
+      raw = raw.replace(/\n\s*/g, ' ');
+      raw = raw.replace(/,\s*]/g, ']');
+      // Parse
+      var terms;
+      try { terms = JSON.parse(raw); } catch(e) { terms = null; }
+      if (!terms || !terms.length) {
+        container.innerHTML = '<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px">Could not parse terms from response.</div>';
+        return;
+      }
+      container.innerHTML = terms.map(function(t) {
+        return '<div class="term-item"><h5>' + (t.term || 'Term') + '</h5><p>' + (t.definition || t.def || '') + '</p></div>';
+      }).join('');
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-wand"></i> Generate Q&A';
+      document.getElementById('termsContainer').innerHTML = '<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px">Error loading terms.</div>';
+    });
+}
+
+// Q&A Generation
+function generateQA() {
+  const btn = document.getElementById('qaBtn');
+  const count = document.getElementById('qaCount').value || 5;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-arrow-clockwise bi-spin"></i> Generating...';
+
+  fetch('/qa', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pdf_id: PDF_ID, num_pairs: parseInt(count) })
+  })
+    .then(r => r.json())
+    .then(data => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-wand"></i> Generate Q&A';
+      const container = document.getElementById('qaContainer');
+      const pairs = data.qa_pairs || [];
+      if (!pairs.length) {
+        container.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted)">No Q&A pairs generated.</div>';
+        return;
+      }
+      container.innerHTML = pairs.map((p, i) => `
+        <div class="qa-card" id="qa-${i}">
+          <div class="q-text"><i class="bi bi-question-circle" style="color:var(--accent);flex-shrink:0;margin-top:2px"></i>${p.question || 'Question ' + (i+1)}</div>
+          <div class="a-text"><strong>A:</strong> ${p.answer || ''}</div>
+          ${(p.page || p.source) ? `
+          <div class="qa-source">
+            <button onclick="scrollToPage(${p.page || 1})"><i class="bi bi-book-open"></i> Page ${p.page || '?'}${p.line ? ', Line ' + p.line : ''}</button>
+          </div>` : ''}
+        </div>
+      `).join('');
+    })
+    .catch(() => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-wand"></i> Generate Q&A';
+      document.getElementById('qaContainer').innerHTML = '<div style="padding:24px;text-align:center;color:var(--error)">Error generating Q&A. Try again.</div>';
+    });
+}
+</script>
+{% endblock %}

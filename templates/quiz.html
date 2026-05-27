@@ -1,0 +1,361 @@
+{% extends "base.html" %}
+
+{% block title %}Quiz - {{ doc.original_name }} - Devnity AI{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/quiz.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="quiz-page">
+    <span id="quizMeta" data-total="{{ total_questions }}" style="display:none"></span>
+    <!-- Topbar -->
+    <header class="quiz-topbar">
+        <a href="{{ url_for('study_room', pdf_id=doc.id) }}" class="back-link">
+            <i class="bi bi-arrow-left"></i>
+            <span>Back</span>
+        </a>
+
+        <div class="topbar-divider"></div>
+
+        <div class="quiz-title">
+            <i class="bi bi-filetype-pdf"></i>
+            <span>Quiz: {{ doc.original_name }}</span>
+        </div>
+
+        <div class="quiz-progress">
+            <div class="quiz-progress-bar">
+                <div class="quiz-progress-bar-fill" id="progressBar" style="width: 0%"></div>
+            </div>
+            <span class="quiz-counter" id="questionCounter">Q1 of {{ total_questions }}</span>
+        </div>
+
+        <div class="quiz-timer">
+            <i class="bi bi-clock"></i>
+            <span class="quiz-timer-text" id="timerDisplay">15:00</span>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="quiz-main">
+        <!-- Question Area -->
+        <div class="quiz-question-area" id="questionArea">
+            <div class="quiz-loading" id="quizLoading">
+                <i class="bi bi-arrow-repeat" style="animation: spin 1s linear infinite; display: inline-block;"></i>
+                <p class="quiz-loading-text">Generating questions...</p>
+            </div>
+
+            <div class="quiz-question-content" id="questionContent" style="display: none;">
+                <div class="quiz-question-header">
+                    <span class="quiz-question-num" id="questionNum">Q1</span>
+                    <span class="badge-green" id="questionTopic">Topic</span>
+                </div>
+                <h2 class="quiz-question-text" id="questionText">Question text will appear here</h2>
+                <div class="quiz-options" id="optionsContainer">
+                    <!-- Options will be inserted here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Sidebar -->
+        <aside class="quiz-nav-sidebar">
+            <h3 class="quiz-nav-title">Question Navigator</h3>
+
+            <div class="quiz-nav-grid" id="navGrid">
+                <!-- Navigation buttons will be inserted here -->
+            </div>
+
+            <div class="quiz-nav-legend">
+                <div class="quiz-nav-legend-item">
+                    <div class="quiz-nav-legend-dot answered"></div>
+                    <span>Answered</span>
+                </div>
+                <div class="quiz-nav-legend-item">
+                    <div class="quiz-nav-legend-dot flagged"></div>
+                    <span>Flagged</span>
+                </div>
+                <div class="quiz-nav-legend-item">
+                    <div class="quiz-nav-legend-dot current"></div>
+                    <span>Current</span>
+                </div>
+                <div class="quiz-nav-legend-item">
+                    <div class="quiz-nav-legend-dot unvisited"></div>
+                    <span>Unvisited</span>
+                </div>
+            </div>
+
+            <div class="quiz-nav-stats">
+                <div class="quiz-nav-stat">
+                    <span class="quiz-nav-stat-label">Answered</span>
+                    <span class="quiz-nav-stat-value success" id="answeredCount">0</span>
+                </div>
+                <div class="quiz-nav-stat">
+                    <span class="quiz-nav-stat-label">Flagged</span>
+                    <span class="quiz-nav-stat-value warning" id="flaggedCount">0</span>
+                </div>
+                <div class="quiz-nav-stat">
+                    <span class="quiz-nav-stat-label">Remaining</span>
+                    <span class="quiz-nav-stat-value" id="remainingCount">{{ total_questions }}</span>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Bottom Bar -->
+    <footer class="quiz-bottombar">
+        <button class="quiz-btn-prev" id="prevBtn" disabled>
+            <i class="bi bi-chevron-left"></i>
+            <span>Previous</span>
+        </button>
+
+        <button class="quiz-btn-flag" id="flagBtn">
+            <i class="bi bi-flag"></i>
+            <span>Flag for Review</span>
+        </button>
+
+        <button class="quiz-btn-next quiz-btn-submit" id="nextBtn">
+            <i class="bi bi-chevron-right"></i>
+            <span>Next</span>
+        </button>
+    </footer>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const pdfId = '{{ doc.id }}';
+const totalQuestions = parseInt(document.getElementById('quizMeta').dataset.total);
+
+let questions = [];
+let currentQuestion = 0;
+let answers = {};
+let flagged = new Set();
+let timeLeft = 15 * 60; // 15 minutes in seconds
+let timerInterval;
+
+// DOM elements
+const quizLoading = document.getElementById('quizLoading');
+const questionContent = document.getElementById('questionContent');
+const questionNum = document.getElementById('questionNum');
+const questionTopic = document.getElementById('questionTopic');
+const questionText = document.getElementById('questionText');
+const optionsContainer = document.getElementById('optionsContainer');
+const navGrid = document.getElementById('navGrid');
+const progressBar = document.getElementById('progressBar');
+const questionCounter = document.getElementById('questionCounter');
+const timerDisplay = document.getElementById('timerDisplay');
+const answeredCount = document.getElementById('answeredCount');
+const flaggedCount = document.getElementById('flaggedCount');
+const remainingCount = document.getElementById('remainingCount');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+const flagBtn = document.getElementById('flagBtn');
+
+// Format time
+function formatTime(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+// Update timer
+function updateTimer() {
+    timerDisplay.textContent = formatTime(timeLeft);
+
+    if (timeLeft <= 0) {
+        clearInterval(timerInterval);
+        submitQuiz();
+    } else {
+        timeLeft--;
+    }
+}
+
+// Update progress
+function updateProgress() {
+    const progress = (Object.keys(answers).length / totalQuestions) * 100;
+    progressBar.style.width = `${progress}%`;
+    questionCounter.textContent = `Q${currentQuestion + 1} of ${totalQuestions}`;
+
+    answeredCount.textContent = Object.keys(answers).length;
+    flaggedCount.textContent = flagged.size;
+    remainingCount.textContent = totalQuestions - Object.keys(answers).length;
+}
+
+// Render navigation
+function renderNavigation() {
+    navGrid.innerHTML = '';
+
+    for (let i = 0; i < totalQuestions; i++) {
+        const btn = document.createElement('button');
+        btn.className = 'quiz-nav-btn';
+        btn.textContent = i + 1;
+        btn.onclick = () => goToQuestion(i);
+
+        if (i === currentQuestion) {
+            btn.classList.add('current');
+        } else if (flagged.has(i)) {
+            btn.classList.add('flagged');
+        } else if (answers[i] !== undefined) {
+            btn.classList.add('answered');
+        } else {
+            btn.classList.add('unvisited');
+        }
+
+        navGrid.appendChild(btn);
+    }
+}
+
+// Render question
+function renderQuestion() {
+    const q = questions[currentQuestion];
+
+    questionNum.textContent = `Q${currentQuestion + 1}`;
+    questionTopic.textContent = q.topic || 'General';
+    questionText.textContent = q.question;
+
+    // Render options
+    optionsContainer.innerHTML = '';
+    const letters = ['A', 'B', 'C', 'D'];
+
+    letters.forEach(letter => {
+        const isSelected = answers[currentQuestion] === letter;
+        const option = document.createElement('button');
+        option.className = `quiz-option ${isSelected ? 'selected' : ''}`;
+        option.innerHTML = `
+            <span class="quiz-option-radio">
+                ${isSelected ? '<i class="bi bi-check-lg"></i>' : letter}
+            </span>
+            <span class="quiz-option-text">${q.options[letter]}</span>
+        `;
+        option.onclick = () => selectOption(letter);
+        optionsContainer.appendChild(option);
+    });
+
+    // Update flag button
+    flagBtn.innerHTML = flagged.has(currentQuestion)
+        ? '<i class="bi bi-flag"></i><span>Unflag Question</span>'
+        : '<i class="bi bi-flag"></i><span>Flag for Review</span>';
+    flagBtn.classList.toggle('active', flagged.has(currentQuestion));
+
+    // Update navigation buttons
+    prevBtn.disabled = currentQuestion === 0;
+
+    if (currentQuestion === totalQuestions - 1) {
+        nextBtn.innerHTML = '<i class="bi bi-check-lg"></i><span>Submit</span>';
+        nextBtn.classList.add('quiz-btn-submit');
+    } else {
+        nextBtn.innerHTML = '<span>Next</span><i class="bi bi-chevron-right"></i>';
+        nextBtn.classList.remove('quiz-btn-submit');
+    }
+
+    updateProgress();
+    renderNavigation();
+}
+
+// Select option
+function selectOption(letter) {
+    answers[currentQuestion] = letter;
+    renderQuestion();
+}
+
+// Go to question
+function goToQuestion(index) {
+    currentQuestion = index;
+    renderQuestion();
+}
+
+// Previous question
+prevBtn.onclick = () => {
+    if (currentQuestion > 0) {
+        currentQuestion--;
+        renderQuestion();
+    }
+};
+
+// Next question
+nextBtn.onclick = () => {
+    if (currentQuestion < totalQuestions - 1) {
+        currentQuestion++;
+        renderQuestion();
+    } else {
+        submitQuiz();
+    }
+};
+
+// Flag question
+flagBtn.onclick = () => {
+    if (flagged.has(currentQuestion)) {
+        flagged.delete(currentQuestion);
+    } else {
+        flagged.add(currentQuestion);
+    }
+    renderQuestion();
+};
+
+// Submit quiz
+async function submitQuiz() {
+    const durationSeconds = (15 * 60) - timeLeft;
+
+    nextBtn.disabled = true;
+    nextBtn.innerHTML = '<i class="bi bi-arrow-repeat" style="animation: spin 1s linear infinite; display: inline-block;"></i><span>Submitting...</span>';
+
+    try {
+        const response = await fetch('/quiz/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                pdf_id: pdfId,
+                questions: questions,
+                answers: answers,
+                duration_seconds: durationSeconds
+            })
+        });
+
+        if (response.ok) {
+            window.location.href = '/analytics-page';
+        } else {
+            throw new Error('Failed to submit');
+        }
+    } catch (err) {
+        nextBtn.disabled = false;
+        nextBtn.innerHTML = '<i class="bi bi-check-lg"></i><span>Submit</span>';
+        if (typeof showToast === 'function') showToast('Failed to submit quiz. Please try again.', 'error');
+        else alert('Failed to submit quiz. Please try again.');
+    }
+}
+
+// Load questions
+async function loadQuestions() {
+    try {
+        const response = await fetch('/mcqs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                pdf_id: pdfId,
+                num_questions: totalQuestions
+            })
+        });
+
+        const data = await response.json();
+        questions = data.mcqs || [];
+
+        quizLoading.style.display = 'none';
+        questionContent.style.display = 'block';
+
+        renderQuestion();
+        timerInterval = setInterval(updateTimer, 1000);
+    } catch (err) {
+        quizLoading.innerHTML = `
+            <i class="bi bi-exclamation-triangle" style="color: var(--warning);"></i>
+            <p class="quiz-loading-text">Failed to generate questions.</p>
+            <button class="btn btn-primary" onclick="loadQuestions()" style="margin-top: 1rem;">
+                <i class="bi bi-arrow-repeat"></i> Retry
+            </button>
+        `;
+    }
+}
+
+// Initialize
+loadQuestions();
+</script>
+{% endblock %}

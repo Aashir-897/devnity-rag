@@ -1,7 +1,6 @@
 groq==1.2.0
 PyMuPDF==1.24.14
 sentence-transformers==2.3.1
-langchain==0.1.0
 Flask==3.0.0
 Flask-Cors==4.0.0
 Flask-Login==0.6.3
@@ -13,3 +12,4 @@ paddlepaddle==2.6.2
 boto3==1.34.0
 pymysql==1.2.0
 qdrant-client==1.9.0
+chromadb==0.4.22

@@ -1,1503 +1,200 @@
 {% extends "base.html" %}
-{% block extra_head %}
-<style>
-  :root {
-    --bg: #0a0a0f;
-    --surface: #12121a;
-    --border: #1e1e2e;
-    --accent: #7c6af7;
-    --accent2: #f7a26a;
-    --text: #e8e8f0;
-    --muted: #6b6b80;
-    --success: #4ade80;
-    --error: #f87171;
-  }
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+{% block title %}Dashboard - Devnity AI{% endblock %}
 
-  body {
-    font-family: 'Syne', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(124,106,247,.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(124,106,247,.04) 1px, transparent 1px);
-    background-size: 48px 48px;
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  .container { max-width: 960px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
-
-  header {
-    padding: 48px 0 32px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .logo { display: flex; align-items: center; gap: 12px; }
-
-  .logo-icon {
-    width: 40px; height: 40px;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px;
-  }
-
-  .logo-text { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
-  .logo-sub { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; margin-top: 1px; }
-
-  .status-badge {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: var(--success);
-    border: 1px solid rgba(74,222,128,.2);
-    padding: 4px 10px;
-    border-radius: 20px;
-    display: flex; align-items: center; gap: 6px;
-  }
-
-  .status-dot {
-    width: 6px; height: 6px;
-    background: var(--success);
-    border-radius: 50%;
-    animation: pulse 2s infinite;
-  }
-
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-
-  /* ── Upload Zone ── */
-  .upload-zone {
-    border: 2px dashed var(--border);
-    border-radius: 16px;
-    padding: 56px 32px;
-    text-align: center;
-    cursor: pointer;
-    transition: all .25s ease;
-    background: var(--surface);
-    position: relative;
-    overflow: hidden;
-    margin-bottom: 32px;
-  }
-
-  .upload-zone::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle at 50% 0%, rgba(124,106,247,.08) 0%, transparent 70%);
-    pointer-events: none;
-  }
-
-  .upload-zone:hover, .upload-zone.drag-over {
-    border-color: var(--accent);
-    background: rgba(124,106,247,.06);
-  }
-
-  .upload-zone.disabled { opacity: .4; pointer-events: none; }
-
-  .upload-icon { font-size: 48px; margin-bottom: 16px; }
-
-  .upload-title { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
-
-  .upload-sub {
-    color: var(--muted);
-    font-size: 14px;
-    font-family: 'JetBrains Mono', monospace;
-  }
-
-  .upload-btn {
-    display: inline-block;
-    margin-top: 20px;
-    padding: 10px 24px;
-    background: linear-gradient(135deg, var(--accent), #5a4fcf);
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: transform .15s, box-shadow .15s;
-    border: none;
-    color: white;
-  }
-
-  .upload-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(124,106,247,.3); }
-
-  /* ── Processing Modal ── */
-  .processing-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,.7);
-    backdrop-filter: blur(8px);
-    z-index: 100;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-  }
-
-  .processing-overlay.visible { display: flex; }
-
-  .processing-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 40px;
-    max-width: 560px;
-    width: 100%;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .processing-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, var(--accent), var(--accent2));
-    animation: barShimmer 2s infinite;
-    background-size: 200% 100%;
-  }
-
-  @keyframes barShimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
-  }
-
-  .processing-title {
-    font-size: 20px; font-weight: 700;
-    margin-bottom: 4px;
-    display: flex; align-items: center; gap: 10px;
-  }
-
-  .processing-filename {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    color: var(--muted);
-    margin-bottom: 28px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .progress-bar-bg {
-    height: 6px;
-    background: var(--border);
-    border-radius: 3px;
-    overflow: hidden;
-    margin-bottom: 8px;
-  }
-
-  .progress-bar {
-    height: 100%;
-    background: linear-gradient(90deg, var(--accent), var(--accent2));
-    border-radius: 3px;
-    width: 0%;
-    transition: width .3s ease;
-  }
-
-  .progress-pct {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    color: var(--muted);
-    text-align: right;
-    margin-bottom: 28px;
-  }
-
-  .status-message {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    color: var(--text);
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px 16px;
-    margin-bottom: 24px;
-    min-height: 48px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .status-message .spinner {
-    display: inline-block;
-    width: 16px; height: 16px;
-    border: 2px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin .6s linear infinite;
-    flex-shrink: 0;
-  }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* ── Step Timeline ── */
-  .step-timeline {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .step-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 12px;
-    border-radius: 10px;
-    transition: all .3s;
-    opacity: .3;
-  }
-
-  .step-item.active {
-    opacity: 1;
-    background: rgba(124,106,247,.08);
-    border: 1px solid rgba(124,106,247,.2);
-  }
-
-  .step-item.done { opacity: .7; }
-  .step-item.error { opacity: 1; background: rgba(248,113,113,.08); border: 1px solid rgba(248,113,113,.2); }
-
-  .step-icon {
-    width: 28px; height: 28px;
-    border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 14px;
-    flex-shrink: 0;
-    background: var(--border);
-    transition: all .3s;
-  }
-
-  .step-item.active .step-icon {
-    background: linear-gradient(135deg, var(--accent), #5a4fcf);
-    box-shadow: 0 0 16px rgba(124,106,247,.4);
-    animation: iconPulse 1.5s infinite;
-  }
-
-  .step-item.done .step-icon {
-    background: rgba(74,222,128,.15);
-    color: var(--success);
-  }
-
-  .step-item.error .step-icon {
-    background: rgba(248,113,113,.15);
-    color: var(--error);
-  }
-
-  @keyframes iconPulse {
-    0%,100% { box-shadow: 0 0 16px rgba(124,106,247,.4); }
-    50% { box-shadow: 0 0 24px rgba(124,106,247,.6); }
-  }
-
-  .step-label {
-    font-size: 13px;
-    font-weight: 600;
-    flex: 1;
-  }
-
-  .step-check {
-    font-size: 16px;
-    opacity: 0;
-    transition: opacity .3s;
-  }
-
-  .step-item.done .step-check { opacity: 1; }
-  .step-item.error .step-check { opacity: 1; color: var(--error); }
-
-  /* ── Error state ── */
-  .processing-error {
-    display: none;
-    text-align: center;
-    padding: 20px;
-  }
-
-  .processing-error.visible { display: block; }
-
-  .error-icon {
-    font-size: 48px;
-    margin-bottom: 12px;
-  }
-
-  .error-msg {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    color: var(--error);
-    margin-bottom: 20px;
-    word-break: break-word;
-  }
-
-  .retry-btn {
-    padding: 10px 24px;
-    background: linear-gradient(135deg, var(--error), #dc2626);
-    border: none;
-    border-radius: 8px;
-    color: white;
-    font-family: 'Syne', sans-serif;
-    font-weight: 600;
-    font-size: 14px;
-    cursor: pointer;
-    transition: transform .15s;
-  }
-
-  .retry-btn:hover { transform: translateY(-1px); }
-
-  /* ── Panels ── */
-  .panels { display: none; gap: 16px; flex-direction: column; }
-  .panels.visible { display: flex; }
-
-  .panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    overflow: hidden;
-  }
-
-  .panel-header {
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    cursor: pointer;
-  }
-
-  .panel-title {
-    font-size: 14px;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .panel-tag {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    background: rgba(124,106,247,.15);
-    color: var(--accent);
-    padding: 2px 8px;
-    border-radius: 4px;
-  }
-
-  .panel-body { padding: 20px; }
-
-  .summary-text {
-    font-size: 14px;
-    line-height: 1.8;
-    color: var(--text);
-    white-space: pre-wrap;
-  }
-
-  .mcq-controls {
-    display: flex; align-items: center; gap: 12px;
-    margin-bottom: 20px;
-  }
-
-  .mcq-count {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 14px;
-    color: var(--text);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    width: 80px;
-  }
-
-  .btn {
-    padding: 9px 20px;
-    border-radius: 8px;
-    border: none;
-    font-family: 'Syne', sans-serif;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all .15s;
-  }
-
-  .btn-primary {
-    background: linear-gradient(135deg, var(--accent), #5a4fcf);
-    color: white;
-  }
-
-  .btn-primary:hover { box-shadow: 0 4px 16px rgba(124,106,247,.3); transform: translateY(-1px); }
-  .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
-
-  .mcq-card {
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 18px;
-    margin-bottom: 14px;
-    transition: border-color .2s;
-  }
-
-  .mcq-question {
-    font-size: 14px;
-    font-weight: 600;
-    margin-bottom: 14px;
-    line-height: 1.5;
-  }
-
-  .mcq-options { display: flex; flex-direction: column; gap: 8px; }
-
-  .mcq-option {
-    padding: 10px 14px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    cursor: pointer;
-    font-size: 13px;
-    transition: all .15s;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: var(--bg);
-  }
-
-  .mcq-option:hover:not(.selected):not(.correct):not(.wrong) {
-    border-color: var(--accent);
-    background: rgba(124,106,247,.08);
-  }
-
-  .mcq-option.correct { border-color: var(--success); background: rgba(74,222,128,.1); }
-  .mcq-option.wrong   { border-color: var(--error);   background: rgba(248,113,113,.1); }
-
-  .opt-label {
-    width: 22px; height: 22px;
-    border-radius: 6px;
-    background: var(--border);
-    display: flex; align-items: center; justify-content: center;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    font-weight: 600;
-    flex-shrink: 0;
-  }
-
-  .mcq-explanation {
-    display: none;
-    margin-top: 12px;
-    padding: 12px;
-    background: rgba(124,106,247,.08);
-    border-radius: 8px;
-    font-size: 13px;
-    color: var(--muted);
-    line-height: 1.6;
-  }
-
-  .qa-controls {
-    display: flex; align-items: center; gap: 12px;
-    margin-bottom: 20px;
-  }
-
-  .qa-count {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 14px;
-    color: var(--text);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    width: 80px;
-  }
-
-  .qa-card {
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 18px;
-    margin-bottom: 14px;
-  }
-
-  .qa-question {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--accent2);
-    margin-bottom: 8px;
-    line-height: 1.5;
-  }
-
-  .qa-answer {
-    font-size: 13px;
-    line-height: 1.7;
-    color: var(--text);
-  }
-    border-left: 3px solid var(--accent);
-  }
-
-  .chat-messages {
-    min-height: 200px;
-    max-height: 400px;
-    overflow-y: auto;
-    margin-bottom: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .msg {
-    padding: 12px 16px;
-    border-radius: 10px;
-    font-size: 14px;
-    line-height: 1.6;
-    max-width: 85%;
-  }
-
-  .msg-user {
-    background: linear-gradient(135deg, rgba(124,106,247,.2), rgba(124,106,247,.1));
-    border: 1px solid rgba(124,106,247,.3);
-    align-self: flex-end;
-    font-weight: 600;
-  }
-
-  .msg-ai {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    align-self: flex-start;
-  }
-
-  .msg-ai .msg-label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    color: var(--accent);
-    margin-bottom: 6px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
-
-  .chat-input-wrap {
-    display: flex;
-    gap: 10px;
-  }
-
-  .chat-input {
-    flex: 1;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px 14px;
-    color: var(--text);
-    font-family: 'Syne', sans-serif;
-    font-size: 14px;
-    outline: none;
-    transition: border-color .15s;
-  }
-
-  .chat-input:focus { border-color: var(--accent); }
-
-  .pdf-info {
-    display: none;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px 20px;
-    margin-bottom: 24px;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-
-  .pdf-info.visible { display: flex; }
-
-  .pdf-info-left { display: flex; align-items: center; gap: 12px; }
-  .pdf-name { font-size: 14px; font-weight: 600; }
-  .pdf-meta { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); }
-
-  .chip {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    padding: 3px 10px;
-    border-radius: 20px;
-    border: 1px solid var(--border);
-    color: var(--muted);
-  }
-
-  .empty-state {
-    text-align: center;
-    padding: 32px;
-    color: var(--muted);
-    font-size: 13px;
-    font-family: 'JetBrains Mono', monospace;
-  }
-
-  .spinner {
-    display: inline-block;
-    width: 14px; height: 14px;
-    border: 2px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin .6s linear infinite;
-    vertical-align: middle;
-    margin-right: 6px;
-  }
-
-  .score-badge {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    padding: 4px 12px;
-    border-radius: 20px;
-    background: rgba(124,106,247,.15);
-    color: var(--accent);
-    border: 1px solid rgba(124,106,247,.2);
-  }
-
-  .animation-slide-in {
-    animation: slideIn .4s ease;
-  }
-
-  @keyframes slideIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .cancel-btn {
-    position: absolute;
-    top: 16px; right: 16px;
-    background: none;
-    border: none;
-    color: var(--muted);
-    font-size: 20px;
-    cursor: pointer;
-    padding: 4px 8px;
-    border-radius: 6px;
-    transition: all .15s;
-    font-family: 'Syne', sans-serif;
-  }
-
-  .cancel-btn:hover { background: rgba(255,255,255,.05); color: var(--text); }
-
-  /* ── Split Layout ── */
-  .app-layout {
-    display: flex; gap: 16px; align-items: flex-start;
-  }
-
-  .pdf-viewer-panel {
-    flex: 0 0 42%; position: sticky; top: 16px;
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 12px; overflow: hidden;
-    max-height: calc(100vh - 32px);
-  }
-
-  .pdf-viewer-header {
-    padding: 12px 16px; border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: space-between;
-    font-size: 13px; font-weight: 700;
-  }
-
-  .viewer-toggle {
-    background: none; border: none; color: var(--muted);
-    cursor: pointer; font-size: 14px; padding: 4px 8px; border-radius: 4px;
-  }
-  .viewer-toggle:hover { background: rgba(255,255,255,.05); color: var(--text); }
-
-  .pdf-viewer-body {
-    overflow-y: auto; max-height: calc(100vh - 100px);
-    padding: 8px; display: flex; flex-direction: column; align-items: center;
-  }
-
-  .content-panels {
-    flex: 1; min-width: 0;
-    display: flex; flex-direction: column; gap: 16px;
-  }
-
-  .pdf-page-wrapper {
-    position: relative; margin-bottom: 8px; border-radius: 4px; overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0,0,0,.2);
-  }
-
-  .pdf-page-canvas { display: block; }
-
-  .highlight-overlay {
-    position: absolute; background: rgba(255, 230, 0, 0.35);
-    border-radius: 2px; pointer-events: none;
-    animation: highlight-fade 2.5s ease-out forwards;
-  }
-
-  @keyframes highlight-fade {
-    0%   { opacity: 1; }
-    70%  { opacity: 1; }
-    100% { opacity: 0; }
-  }
-
-  /* ── Source References ── */
-  .source-box {
-    margin-top: 10px; padding: 10px 12px;
-    background: rgba(124,106,247,.06);
-    border: 1px solid rgba(124,106,247,.15);
-    border-radius: 8px; font-size: 12px;
-  }
-
-  .source-badge {
-    display: inline-flex; align-items: center; gap: 4px;
-    background: rgba(124,106,247,.12); color: var(--accent);
-    padding: 2px 8px; border-radius: 4px; font-size: 11px;
-    cursor: pointer; font-weight: 600; margin-bottom: 6px;
-    transition: background .15s;
-  }
-  .source-badge:hover { background: rgba(124,106,247,.25); }
-
-  .source-text {
-    color: var(--muted); line-height: 1.5; font-style: italic;
-    word-break: break-word;
-  }
-
-  .citation-link {
-    color: var(--accent2); cursor: pointer; font-weight: 600;
-    text-decoration: underline; text-decoration-style: dotted;
-  }
-  .citation-link:hover { color: var(--accent); }
-
-  .chat-source-box {
-    margin-top: 8px; padding: 8px 10px;
-    background: rgba(124,106,247,.04);
-    border: 1px solid var(--border); border-radius: 6px;
-    font-size: 11px; line-height: 1.5;
-  }
-
-  .chat-source-label {
-    color: var(--muted); font-size: 10px; font-weight: 600;
-    text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px;
-  }
-
-  .documents-section { margin: 24px 0; }
-  .documents-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
-  .doc-card {
-    background: var(--surface); border: 1px solid var(--border);
-    padding: 12px 16px; border-radius: 8px; cursor: pointer;
-    margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;
-    transition: border-color .15s;
-  }
-  .doc-card:hover { border-color: var(--accent); }
-  .doc-name { color: var(--text); font-weight: 500; font-size: 14px; }
-  .doc-meta { color: var(--muted); font-size: 12px; }
-  .doc-delete {
-    background: none; border: 1px solid var(--border); color: var(--error);
-    padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px;
-  }
-  .doc-delete:hover { background: rgba(248,113,113,.1); }
-</style>
-{% endblock %}
 {% block content %}
-<div class="container">
-
-  <header>
-    <div class="logo">
-      <div class="logo-icon">&#x1F4C4;</div>
-      <div>
-        <div class="logo-text">PDF Intelligence</div>
-        <div class="logo-sub">v2.0 &middot; powered by AI</div>
-      </div>
-    </div>
-    <div class="status-badge">
-      <div class="status-dot"></div>
-      system online
-    </div>
-  </header>
-
-  {% if documents %}
-  <div class="documents-section">
-    <h3>Your Documents</h3>
-    {% for doc in documents %}
-    <div class="doc-card" onclick="selectDoc('{{ doc.id }}', '{{ doc.original_name }}')">
-      <div>
-        <div class="doc-name">{{ doc.original_name }}</div>
-        <div class="doc-meta">{{ doc.total_pages }} pages &middot; {{ doc.num_chunks }} chunks</div>
-      </div>
-      <button class="doc-delete" onclick="event.stopPropagation(); deleteDoc('{{ doc.id }}')">Delete</button>
-    </div>
-    {% endfor %}
-  </div>
-  {% endif %}
-
-  <!-- Upload Zone -->
-  <div class="upload-zone" id="uploadZone">
-    <div class="upload-icon">&#x2B06;</div>
-    <div class="upload-title">Drop your PDF here</div>
-    <div class="upload-sub">or click to browse &middot; max 30MB</div>
-    <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
-      Choose PDF
-    </button>
-    <input type="file" id="fileInput" accept=".pdf" style="display:none" onchange="handleFile(this.files[0])">
-  </div>
-
-  <!-- Processing Overlay -->
-  <div class="processing-overlay" id="processingOverlay">
-    <div class="processing-card">
-      <button class="cancel-btn" onclick="closeProcessing()">&times;</button>
-
-      <!-- Main content (shown while processing) -->
-      <div id="processingContent">
-        <div class="processing-title">
-          <span>&#x26A1;</span> Processing PDF
-        </div>
-        <div class="processing-filename" id="processingFilename">—</div>
-
-        <div class="progress-bar-bg">
-          <div class="progress-bar" id="progressBar"></div>
-        </div>
-        <div class="progress-pct" id="progressPct">0%</div>
-
-        <div class="status-message" id="statusMessage">
-          <span class="spinner"></span>
-          <span id="statusText">Starting...</span>
-        </div>
-
-        <div class="step-timeline" id="stepTimeline">
-          <div class="step-item" data-step="Extracting">
-            <div class="step-icon">&#x1F4C4;</div>
-            <div class="step-label">Extracting text &amp; images</div>
-            <div class="step-check">&#x2713;</div>
-          </div>
-          <div class="step-item" data-step="OCR">
-            <div class="step-icon">&#x1F50D;</div>
-            <div class="step-label">Running OCR on scanned pages</div>
-            <div class="step-check">&#x2713;</div>
-          </div>
-          <div class="step-item" data-step="Images">
-            <div class="step-icon">&#x1F5BC;</div>
-            <div class="step-label">Analyzing images with AI</div>
-            <div class="step-check">&#x2713;</div>
-          </div>
-          <div class="step-item" data-step="Embeddings">
-            <div class="step-icon">&#x1F9EA;</div>
-            <div class="step-label">Creating embeddings (this takes time)</div>
-            <div class="step-check">&#x2713;</div>
-          </div>
-          <div class="step-item" data-step="Summary">
-            <div class="step-icon">&#x2728;</div>
-            <div class="step-label">Generating summary &amp; insights</div>
-            <div class="step-check">&#x2713;</div>
-          </div>
-          <div class="step-item" data-step="Done">
-            <div class="step-icon">&#x2705;</div>
-            <div class="step-label">Ready!</div>
-            <div class="step-check">&#x2713;</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Error state -->
-      <div class="processing-error" id="processingError">
-        <div class="error-icon">&#x274C;</div>
-        <div class="error-msg" id="errorMsg">Something went wrong</div>
-        <button class="retry-btn" onclick="closeProcessing()">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- PDF Info Bar -->
-  <div class="pdf-info" id="pdfInfo">
-    <div class="pdf-info-left">
-      <span style="font-size:20px">&#x1F4C4;</span>
-      <div>
-        <div class="pdf-name" id="pdfName">—</div>
-        <div class="pdf-meta" id="pdfMeta">—</div>
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <span class="chip" id="pagesChip">— pages</span>
-      <span class="chip" id="chunksChip">— chunks</span>
-    </div>
-  </div>
-
-  <!-- Split Layout -->
-  <div class="app-layout" id="appLayout" style="display:none">
-
-    <!-- PDF Viewer -->
-    <div class="pdf-viewer-panel" id="pdfViewerPanel">
-      <div class="pdf-viewer-header">
-        <span>&#x1F4C4; Document Viewer</span>
-        <button class="viewer-toggle" onclick="toggleViewer()">&#x2716;</button>
-      </div>
-      <div class="pdf-viewer-body" id="pdfViewerBody">
-        <div id="pdfPages"></div>
-      </div>
+<div class="page-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <h1 class="page-title">Dashboard</h1>
+        <p class="page-subtitle">Welcome back, {{ current_user.email.split('@')[0] if current_user.is_authenticated else 'there' }}</p>
     </div>
 
-    <!-- Content Panels -->
-    <div class="content-panels" id="contentPanels">
-
-    <div class="panel">
-      <div class="panel-header">
-        <div class="panel-title">
-          &#x1F4DD; Summary
-          <span class="panel-tag">AI Generated</span>
+    <!-- Search and Notifications -->
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+        <div class="search-bar">
+            <i class="bi bi-search"></i>
+            <input type="text" id="searchInput" placeholder="Search documents...">
         </div>
-      </div>
-      <div class="panel-body">
-        <div class="summary-text" id="summaryText"></div>
-      </div>
+        <button class="btn btn-ghost btn-icon" title="Notifications">
+            <i class="bi bi-bell"></i>
+        </button>
     </div>
 
-    <div class="panel">
-      <div class="panel-header">
-        <div class="panel-title">
-          &#x1F3AF; MCQ Quiz
-          <span class="panel-tag">Auto Generated</span>
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-header">
+                <div class="stat-icon purple">
+                    <i class="bi bi-file-text"></i>
+                </div>
+                <span class="stat-label">Total Documents</span>
+            </div>
+            <div class="stat-value">{{ stats.total_docs }}</div>
+            <div class="stat-trend success">
+                <i class="bi bi-arrow-up"></i>
+                Active documents
+            </div>
         </div>
-        <div id="mcqScore" class="score-badge" style="display:none"></div>
-      </div>
-      <div class="panel-body">
-        <div class="mcq-controls">
-          <input type="number" class="mcq-count" id="mcqCount" value="5" min="1" max="15">
-          <button class="btn btn-primary" id="mcqBtn" onclick="generateMCQs()">Generate MCQs</button>
+
+        <div class="stat-card">
+            <div class="stat-header">
+                <div class="stat-icon green">
+                    <i class="bi bi-chat-dots"></i>
+                </div>
+                <span class="stat-label">AI Queries Made</span>
+            </div>
+            <div class="stat-value">{{ stats.ai_queries }}</div>
+            <div class="stat-trend">
+                <i class="bi bi-database"></i>
+                Total chunks indexed
+            </div>
         </div>
-        <div id="mcqContainer"><div class="empty-state">Click "Generate MCQs" to start</div></div>
-      </div>
+
+        <div class="stat-card">
+            <div class="stat-header">
+                <div class="stat-icon amber">
+                    <i class="bi bi-trophy"></i>
+                </div>
+                <span class="stat-label">Average Test Score</span>
+            </div>
+            <div class="stat-value">{{ stats.avg_score if stats.avg_score > 0 else '--' }}{% if stats.avg_score > 0 %}%{% endif %}</div>
+            <div class="stat-trend">
+                <i class="bi bi-bar-chart"></i>
+                {% if stats.avg_score > 0 %}Based on quiz results{% else %}Take a quiz to see results{% endif %}
+            </div>
+        </div>
     </div>
 
-    <div class="panel">
-      <div class="panel-header">
-        <div class="panel-title">
-          &#x1F4DD; Q&A Pairs
-          <span class="panel-tag">Auto Generated</span>
+    <!-- Upload Zone -->
+    <div style="margin-bottom: 2rem;">
+        <h2 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem;">Upload Document</h2>
+        <div class="upload-zone" id="uploadZone">
+            <input type="file" id="fileInput" accept=".pdf" style="display: none;">
+            <div class="upload-icon">
+                <i class="bi bi-cloud-upload"></i>
+            </div>
+            <h3 class="upload-title">Drag & drop your PDF here</h3>
+            <p class="upload-subtitle">or</p>
+            <button class="btn btn-secondary" id="browseBtn">
+                <i class="bi bi-folder2-open"></i>
+                Browse Files
+            </button>
+            <p class="upload-info">Supports PDF · Up to 30MB</p>
         </div>
-      </div>
-      <div class="panel-body">
-        <div class="qa-controls">
-          <input type="number" class="qa-count" id="qaCount" value="5" min="1" max="15">
-          <button class="btn btn-primary" id="qaBtn" onclick="generateQA()">Generate Q&A</button>
-        </div>
-        <div id="qaContainer"><div class="empty-state">Click "Generate Q&A" to start</div></div>
-      </div>
     </div>
 
-    <div class="panel">
-      <div class="panel-header">
-        <div class="panel-title">
-          &#x1F4AC; Chat with PDF
-          <span class="panel-tag">RAG Powered</span>
+    <!-- Recent Documents -->
+    <div>
+        <div class="documents-header">
+            <h2 class="documents-title">Recent Documents</h2>
+            <a href="{{ url_for('dashboard') }}" class="documents-link">
+                View all <i class="bi bi-arrow-right"></i>
+            </a>
         </div>
-      </div>
-      <div class="panel-body">
-        <div class="chat-messages" id="chatMessages">
-          <div class="empty-state">Ask anything about your document...</div>
+
+        {% if documents %}
+        <div class="documents-grid" id="documentsGrid">
+            {% for doc in documents %}
+            <div class="doc-card" data-name="{{ doc.original_name.lower() }}">
+                <div class="doc-card-header">
+                    <div class="doc-card-title-row">
+                        <div class="doc-card-icon">
+                            <i class="bi bi-filetype-pdf"></i>
+                        </div>
+                        <div>
+                            <h3 class="doc-card-title">{{ doc.original_name }}</h3>
+                            <div class="doc-card-meta">
+                                <span>{{ doc.created_at.strftime('%b %d, %Y') if doc.created_at else '' }}</span>
+                                {% if doc.total_pages > 0 %}
+                                <span>·</span>
+                                <span>{{ doc.total_pages }} pages</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="doc-card-body">
+                    <span class="doc-card-status {{ doc.status }}">
+                        {% if doc.status == 'ready' %}Ready
+                        {% elif doc.status == 'processing' %}Indexing...
+                        {% else %}Failed{% endif %}
+                    </span>
+                </div>
+                <div class="doc-card-footer">
+                    <div class="doc-card-actions">
+                        {% if doc.status == 'ready' %}
+                        <a href="{{ url_for('study_room', pdf_id=doc.id) }}" class="doc-card-btn primary">
+                            <i class="bi bi-chat-dots"></i> Open Chat
+                        </a>
+                        <a href="{{ url_for('quiz_page', pdf_id=doc.id) }}" class="doc-card-btn secondary">
+                            <i class="bi bi-lightning-charge"></i> Quiz
+                        </a>
+                        {% else %}
+                        <button class="doc-card-btn primary" disabled>
+                            <i class="bi bi-chat-dots"></i> Open Chat
+                        </button>
+                        <button class="doc-card-btn secondary" disabled>
+                            <i class="bi bi-lightning-charge"></i> Quiz
+                        </button>
+                        {% endif %}
+                        <button class="doc-card-btn danger delete-doc-btn" data-id="{{ doc.id }}" title="Delete">
+                            <i class="bi bi-trash3"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
         </div>
-        <div class="chat-input-wrap">
-          <input type="text" class="chat-input" id="chatInput"
-                 placeholder="Ask a question..." onkeydown="if(event.key==='Enter') sendChat()">
-          <button class="btn btn-primary" id="chatBtn" onclick="sendChat()">Send</button>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">
+                <i class="bi bi-folder2-open"></i>
+            </div>
+            <h3 class="empty-title">No documents yet</h3>
+            <p class="empty-text">Upload your first PDF to get started!</p>
         </div>
-      </div>
+        {% endif %}
     </div>
-
-    </div><!-- /content-panels -->
-  </div><!-- /app-layout -->
-
-</div><!-- /container -->
+</div>
 {% endblock %}
-{% block scripts %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js">
-</script>
+
+{% block extra_js %}
 <script>
-let currentPdfId = null;
-let mcqAnswered  = 0;
-let mcqCorrect   = 0;
-let mcqTotal     = 0;
-let eventSource  = null;
+    // Search functionality
+    const searchInput = document.getElementById('searchInput');
+    const documentsGrid = document.getElementById('documentsGrid');
 
-let pdfViewer    = null;
-let pdfScale     = 1.5;
-let linesData    = {};
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
-const STEP_ORDER = ['Extracting', 'OCR', 'Images', 'Embeddings', 'Summary', 'Done'];
-
-// ── Drag & Drop ──
-const zone = document.getElementById('uploadZone');
-
-zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
-zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
-zone.addEventListener('drop', e => {
-  e.preventDefault();
-  zone.classList.remove('drag-over');
-  const f = e.dataTransfer.files[0];
-  if (f && f.name.endsWith('.pdf')) handleFile(f);
-});
-
-
-// ── Processing UI ──
-function showProcessing(filename) {
-  document.getElementById('processingFilename').textContent = filename;
-  document.getElementById('processingOverlay').classList.add('visible');
-  document.getElementById('processingError').classList.remove('visible');
-  document.getElementById('processingContent').style.display = 'block';
-  document.getElementById('progressBar').style.width = '0%';
-  document.getElementById('progressPct').textContent = '0%';
-  document.getElementById('statusText').textContent = 'Starting...';
-
-  // Reset steps
-  document.querySelectorAll('.step-item').forEach(el => {
-    el.classList.remove('active', 'done', 'error');
-  });
-  document.querySelector('.step-item').classList.add('active');
-}
-
-function updateProcessingUI(data) {
-  const { step, progress, message, done, error } = data;
-
-  // Progress bar
-  document.getElementById('progressBar').style.width = (progress || 0) + '%';
-  document.getElementById('progressPct').textContent = (progress || 0) + '%';
-
-  // Status message
-  document.getElementById('statusText').textContent = message || step || '...';
-
-  // Update step timeline
-  const currentIdx = STEP_ORDER.indexOf(step);
-  document.querySelectorAll('.step-item').forEach((el, i) => {
-    el.classList.remove('active', 'done', 'error');
-
-    if (i < currentIdx) {
-      el.classList.add('done');
-    } else if (i === currentIdx) {
-      if (error) {
-        el.classList.add('error');
-      } else if (done) {
-        el.classList.add('done');
-      } else {
-        el.classList.add('active');
-      }
-    }
-  });
-
-  if (done) {
-    document.getElementById('statusMessage').innerHTML = '<span style="color:var(--success)">&#x2705;</span> <span id="statusText">Processing complete!</span>';
-  }
-
-  if (error) {
-    document.getElementById('statusMessage').innerHTML = '<span style="color:var(--error)">&#x274C;</span> <span id="statusText">' + (message || 'Error occurred') + '</span>';
-  }
-}
-
-function closeProcessing() {
-  if (eventSource) {
-    eventSource.close();
-    eventSource = null;
-  }
-  document.getElementById('processingOverlay').classList.remove('visible');
-  document.getElementById('uploadZone').classList.remove('disabled');
-}
-
-
-// ── Upload ──
-async function handleFile(file) {
-  if (!file) return;
-
-  document.getElementById('uploadZone').classList.add('disabled');
-  showProcessing(file.name);
-
-  try {
-    const form = new FormData();
-    form.append('pdf', file);
-
-    const res  = await fetch('/upload', { method: 'POST', body: form });
-    const data = await res.json();
-
-    if (!res.ok) {
-      showProcessingError(data.error || 'Upload failed');
-      return;
+    if (searchInput && documentsGrid) {
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            const cards = documentsGrid.querySelectorAll('.doc-card');
+            cards.forEach(card => {
+                const name = card.dataset.name;
+                card.style.display = name.includes(query) ? '' : 'none';
+            });
+        });
     }
 
-    // Connect to SSE for real-time progress
-    connectSSE(data.pdf_id, file.name);
+    // Delete document
+    document.querySelectorAll('.delete-doc-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const confirmed = await showConfirm('Are you sure you want to delete this document?', 'Delete Document');
+            if (!confirmed) return;
 
-  } catch (err) {
-    showProcessingError('Connection error: ' + err.message);
-  }
-}
-
-function connectSSE(pdfId, filename) {
-  if (eventSource) eventSource.close();
-
-  eventSource = new EventSource('/progress/' + pdfId);
-
-  eventSource.onmessage = function(event) {
-    const data = JSON.parse(event.data);
-    updateProcessingUI(data);
-
-    if (data.done) {
-      eventSource.close();
-      eventSource = null;
-
-      // Show results after brief delay
-      setTimeout(() => {
-        closeProcessing();
-        currentPdfId = data.result.pdf_id;
-        showResults(data.result);
-      }, 800);
-    }
-
-    if (data.error) {
-      eventSource.close();
-      eventSource = null;
-      showProcessingError(data.message || 'Processing failed');
-    }
-  };
-
-  eventSource.onerror = function() {
-    eventSource.close();
-    eventSource = null;
-    showProcessingError('Lost connection to server. Please try again.');
-  };
-}
-
-function showProcessingError(msg) {
-  document.getElementById('processingContent').style.display = 'none';
-  document.getElementById('processingError').classList.add('visible');
-  document.getElementById('errorMsg').textContent = msg;
-}
-
-
-function showResults(data) {
-  // PDF info bar
-  const info = document.getElementById('pdfInfo');
-  info.classList.add('visible');
-  document.getElementById('pdfName').textContent   = data.filename;
-  document.getElementById('pdfMeta').textContent   = 'ID: ' + data.pdf_id;
-  document.getElementById('pagesChip').textContent  = data.total_pages + ' pages';
-  document.getElementById('chunksChip').textContent = data.num_chunks + ' chunks';
-
-  // Summary
-  document.getElementById('summaryText').textContent = data.summary;
-
-  // Show app layout with animation
-  const layout = document.getElementById('appLayout');
-  layout.style.display = 'flex';
-  layout.querySelectorAll('.panel').forEach((p, i) => {
-    p.style.animationDelay = (i * 0.1) + 's';
-    p.classList.add('animation-slide-in');
-  });
-
-  // Load PDF viewer
-  loadPDF(`/pdf/${data.pdf_id}/file`);
-  fetch(`/pdf/${data.pdf_id}/lines`)
-    .then(r => r.json())
-    .then(d => { linesData = d; })
-    .catch(() => {});
-}
-
-
-// ── MCQs ──
-async function generateMCQs() {
-  if (!currentPdfId) return;
-
-  const n   = parseInt(document.getElementById('mcqCount').value) || 5;
-  const btn = document.getElementById('mcqBtn');
-
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>Generating...';
-  document.getElementById('mcqContainer').innerHTML = '<div class="empty-state"><span class="spinner"></span>Creating questions...</div>';
-  document.getElementById('mcqScore').style.display = 'none';
-
-  try {
-    const res  = await fetch('/mcqs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pdf_id: currentPdfId, num_questions: n })
+            const docId = btn.dataset.id;
+            try {
+                const response = await fetch(`/pdf/${docId}`, { method: 'DELETE' });
+                if (response.ok) {
+                    btn.closest('.doc-card').remove();
+                    showToast('Document deleted', 'success');
+                } else {
+                    showToast('Failed to delete document', 'error');
+                }
+            } catch (err) {
+                showToast('Failed to delete document', 'error');
+            }
+        });
     });
-    const data = await res.json();
-
-    if (!res.ok) { alert('Error: ' + data.error); return; }
-
-    renderMCQs(data.mcqs);
-  } catch (err) {
-    alert('Error: ' + err.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Generate MCQs';
-  }
-}
-
-function renderMCQs(mcqs) {
-  mcqAnswered = 0; mcqCorrect = 0; mcqTotal = mcqs.length;
-
-  const container = document.getElementById('mcqContainer');
-  container.innerHTML = '';
-
-  mcqs.forEach((mcq, qi) => {
-    const card = document.createElement('div');
-    card.className = 'mcq-card';
-    card.id = `mcq-${qi}`;
-
-    const opts = Object.entries(mcq.options).map(([key, val]) => `
-      <div class="mcq-option" id="opt-${qi}-${key}" onclick="selectAnswer(${qi}, '${key}', '${mcq.answer}', \`${mcq.explanation.replace(/`/g,"'")}\`)">
-        <span class="opt-label">${key}</span>
-        ${val}
-      </div>
-    `).join('');
-
-    const sourceHtml = mcq.source ? `
-      <div class="source-box">
-        <span class="source-badge" onclick="highlightLine(${mcq.page || 1}, ${mcq.line || 1})">
-          &#x1F4D1; Page ${mcq.page || '?'}${mcq.line ? ', Line ' + mcq.line : ''}
-        </span>
-        <div class="source-text">"${mcq.source}"</div>
-      </div>` : '';
-
-    card.innerHTML = `
-      <div class="mcq-question">Q${qi + 1}. ${mcq.question}</div>
-      <div class="mcq-options">${opts}</div>
-      <div class="mcq-explanation" id="exp-${qi}">&#x1F4A1; ${mcq.explanation}</div>
-      ${sourceHtml}
-    `;
-    container.appendChild(card);
-  });
-}
-
-function selectAnswer(qi, selected, correct, explanation) {
-  if (document.getElementById(`opt-${qi}-A`).style.pointerEvents === 'none') return;
-
-  mcqAnswered++;
-  if (selected === correct) mcqCorrect++;
-
-  ['A','B','C','D'].forEach(k => {
-    const el = document.getElementById(`opt-${qi}-${k}`);
-    if (!el) return;
-    el.style.pointerEvents = 'none';
-    if (k === correct) el.classList.add('correct');
-    else if (k === selected) el.classList.add('wrong');
-  });
-
-  document.getElementById(`exp-${qi}`).style.display = 'block';
-
-  if (mcqAnswered === mcqTotal) {
-    const badge = document.getElementById('mcqScore');
-    badge.textContent = `Score: ${mcqCorrect}/${mcqTotal}`;
-    badge.style.display = 'block';
-  }
-}
-
-
-// ── Q&A Pairs ──
-async function generateQA() {
-  if (!currentPdfId) return;
-
-  const n   = parseInt(document.getElementById('qaCount').value) || 5;
-  const btn = document.getElementById('qaBtn');
-
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>Generating...';
-  document.getElementById('qaContainer').innerHTML = '<div class="empty-state"><span class="spinner"></span>Creating Q&A pairs...</div>';
-
-  try {
-    const res  = await fetch('/qa', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pdf_id: currentPdfId, num_pairs: n })
-    });
-    const data = await res.json();
-
-    if (!res.ok) { alert('Error: ' + data.error); return; }
-
-    renderQA(data.qa_pairs);
-  } catch (err) {
-    alert('Error: ' + err.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Generate Q&A';
-  }
-}
-
-function renderQA(pairs) {
-  const container = document.getElementById('qaContainer');
-  container.innerHTML = '';
-
-  pairs.forEach((pair, i) => {
-    const card = document.createElement('div');
-    card.className = 'qa-card';
-
-    const sourceHtml = pair.source ? `
-      <div class="source-box">
-        <span class="source-badge" onclick="highlightLine(${pair.page || 1}, ${pair.line || 1})">
-          &#x1F4D1; Page ${pair.page || '?'}${pair.line ? ', Line ' + pair.line : ''}
-        </span>
-        <div class="source-text">"${pair.source}"</div>
-      </div>` : '';
-
-    card.innerHTML = `
-      <div class="qa-question">Q${i + 1}. ${pair.question}</div>
-      <div class="qa-answer">${pair.answer}</div>
-      ${sourceHtml}
-    `;
-    container.appendChild(card);
-  });
-}
-
-
-// ── Chat ──
-function renderChatAnswer(text) {
-  // Convert [Page N, Line M] citations into clickable links
-  return text.replace(/\[Page (\d+), Line (\d+)\]/g,
-    '<a class="citation-link" onclick="highlightLine($1, $2)">[Page $1, Line $2]</a>');
-}
-
-async function sendChat() {
-  const input = document.getElementById('chatInput');
-  const q = input.value.trim();
-  if (!q || !currentPdfId) return;
-
-  input.value = '';
-  const msgs = document.getElementById('chatMessages');
-
-  const empty = msgs.querySelector('.empty-state');
-  if (empty) empty.remove();
-
-  const userMsg = document.createElement('div');
-  userMsg.className = 'msg msg-user';
-  userMsg.textContent = q;
-  msgs.appendChild(userMsg);
-
-  const aiMsg = document.createElement('div');
-  aiMsg.className = 'msg msg-ai';
-  aiMsg.innerHTML = '<div class="msg-label">PDF AI</div><span class="spinner"></span> Thinking...';
-  msgs.appendChild(aiMsg);
-  msgs.scrollTop = msgs.scrollHeight;
-
-  document.getElementById('chatBtn').disabled = true;
-
-  try {
-    const res  = await fetch('/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pdf_id: currentPdfId, question: q })
-    });
-    const data = await res.json();
-
-    let html = '<div class="msg-label">PDF AI</div>';
-    html += renderChatAnswer(data.answer || data.error);
-
-    // Source chunks from retrieval
-    if (data.sources && data.sources.length) {
-      html += '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">';
-      data.sources.forEach((s, i) => {
-        const pages = s.pages && s.pages.length ? s.pages.join(', ') : '?';
-        const lines = s.lines && s.lines.length
-          ? `Line ${s.lines[0].line}${s.lines.length > 1 ? '-' + s.lines[s.lines.length-1].line : ''}`
-          : '';
-        html += `<div class="chat-source-box">
-          <div class="chat-source-label">&#x1F4D1; Source ${i+1} &middot; Page ${pages}${lines ? ' &middot; ' + lines : ''}</div>
-          <div style="color:var(--muted);font-style:italic">"${s.text.substring(0, 200)}${s.text.length > 200 ? '...' : ''}"</div>
-        </div>`;
-      });
-      html += '</div>';
-    }
-
-    aiMsg.innerHTML = html;
-  } catch (err) {
-    aiMsg.innerHTML = `<div class="msg-label">PDF AI</div>Error: ${err.message}`;
-  } finally {
-    document.getElementById('chatBtn').disabled = false;
-    msgs.scrollTop = msgs.scrollHeight;
-  }
-}
-
-
-// ── PDF Viewer ──
-function toggleViewer() {
-  const panel = document.getElementById('pdfViewerPanel');
-  const btn   = panel.querySelector('.viewer-toggle');
-  if (panel.style.display === 'none') {
-    panel.style.display = 'block';
-    btn.textContent = '\u2716';
-  } else {
-    panel.style.display = 'none';
-    btn.textContent = '\u25A9';
-  }
-}
-
-async function selectDoc(pdfId, name) {
-  currentPdfId = pdfId;
-  document.querySelectorAll('.doc-card').forEach(c => c.style.borderColor = '');
-  event.currentTarget.style.borderColor = 'var(--accent)';
-  try {
-    const r = await fetch('/pdf/' + pdfId + '/info');
-    const data = await r.json();
-    showResults(data);
-  } catch (e) {
-    console.error('Error loading doc info:', e);
-    document.getElementById('pdfViewerPanel').style.display = 'block';
-    loadPDF('/pdf/' + pdfId + '/file');
-  }
-}
-
-async function deleteDoc(pdfId) {
-  if (!confirm('Delete this document?')) return;
-  try {
-    const r = await fetch('/pdf/' + pdfId, { method: 'DELETE' });
-    if (r.ok) location.reload();
-  } catch (e) { console.error(e); }
-}
-
-async function loadPDF(url) {
-  try {
-    pdfViewer = await pdfjsLib.getDocument(url).promise;
-    const container = document.getElementById('pdfPages');
-    container.innerHTML = '';
-    for (let i = 1; i <= pdfViewer.numPages; i++) {
-      await renderPage(i, container);
-    }
-    document.getElementById('pdfViewerPanel').style.display = 'block';
-  } catch (e) {
-    console.error('PDF load error:', e);
-  }
-}
-
-async function renderPage(num, container) {
-  const page = await pdfViewer.getPage(num);
-  const viewport = page.getViewport({scale: pdfScale});
-
-  const wrapper = document.createElement('div');
-  wrapper.className = 'pdf-page-wrapper';
-  wrapper.id = `pdf-page-${num}`;
-  wrapper.style.width = viewport.width + 'px';
-  wrapper.style.height = viewport.height + 'px';
-
-  const canvas = document.createElement('canvas');
-  canvas.className = 'pdf-page-canvas';
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
-  wrapper.appendChild(canvas);
-
-  container.appendChild(wrapper);
-
-  await page.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
-}
-
-async function highlightLine(pageNum, lineNum) {
-  const wrapper = document.getElementById(`pdf-page-${pageNum}`);
-  if (!wrapper) return;
-
-  // Remove old highlights
-  wrapper.querySelectorAll('.highlight-overlay').forEach(el => el.remove());
-
-  // Scroll viewer to this page
-  document.getElementById('pdfViewerBody').scrollTo({
-    top: wrapper.offsetTop - 16,
-    behavior: 'smooth'
-  });
-
-  // Get line bbox from pre-loaded linesData
-  const pageData = linesData[pageNum] || [];
-  const lineData = pageData.find(l => l.line === lineNum);
-  if (!lineData || !lineData.bbox) return;
-
-  const [x0, y0, x1, y1] = lineData.bbox;
-
-  const overlay = document.createElement('div');
-  overlay.className = 'highlight-overlay';
-  overlay.style.left = (x0 * pdfScale) + 'px';
-  overlay.style.top = (y0 * pdfScale) + 'px';
-  overlay.style.width = ((x1 - x0) * pdfScale) + 'px';
-  overlay.style.height = ((y1 - y0) * pdfScale) + 'px';
-  wrapper.appendChild(overlay);
-
-  setTimeout(() => overlay.remove(), 2500);
-}
 </script>
 {% endblock %}
