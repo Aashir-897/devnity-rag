@@ -512,12 +512,10 @@ def health():
     return jsonify({"status": "ok", "documents": doc_count})
 
 
-@app.route("/debug/test-email", methods=["POST"])
-@login_required
+@app.route("/debug/test-email", methods=["GET"])
 def debug_test_email():
     from services.email_service import send_email, EMAIL_LOG
-    to = request.json.get("email", current_user.email)
-    # Clear previous log
+    to = request.args.get("email", "aashirahmed510@gmail.com")
     open(EMAIL_LOG, "w").close()
     result = send_email(to, "Devnity AI — Debug Test", "<h1>Test</h1><p>If you see this, email works!</p>")
     try:
@@ -528,7 +526,6 @@ def debug_test_email():
 
 
 @app.route("/debug/email-log", methods=["GET"])
-@login_required
 def debug_email_log():
     from services.email_service import EMAIL_LOG
     try:
