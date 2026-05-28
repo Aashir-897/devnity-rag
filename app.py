@@ -8,6 +8,7 @@ import threading
 from flask import Flask, request, jsonify, render_template, Response, send_file, send_from_directory, redirect, url_for, session, flash
 from flask_cors import CORS
 from flask_login import LoginManager, login_required, login_user, current_user
+from flask_migrate import Migrate
 
 from config import TEMP_DIR, IMAGES_DIR, PDFS_DIR, PORT, HOST, DEBUG, DATABASE_URL, SESSION_SECRET
 from models import db, User
@@ -40,6 +41,7 @@ app.config["REMEMBER_COOKIE_HTTPONLY"] = True
 
 CORS(app, supports_credentials=True)
 db.init_app(app)
+migrate = Migrate(app, db)
 
 login_manager = LoginManager()
 login_manager.login_view = "auth.login"
@@ -52,18 +54,12 @@ def load_user(user_id: str):
 
 
 with app.app_context():
-    from models import User, Document  # noqa
-    db.create_all()
-    # Auto-migrate: add new columns if missing (safe for re-runs)
-    import sqlalchemy as sa
-    inspector = sa.inspect(db.engine)
-    cols = {c["name"] for c in inspector.get_columns("users")}
-    for col, dtype in [("is_verified", "BOOLEAN DEFAULT 1"), ("verification_token", "VARCHAR(100)"), ("reset_token", "VARCHAR(100)"), ("reset_token_expires", "DATETIME")]:
-        if col not in cols:
-            with db.engine.connect() as conn:
-                conn.execute(sa.text(f"ALTER TABLE users ADD COLUMN {col} {dtype}"))
-                conn.commit()
-            print(f"Migrated: added column {col} to users table")
+    from flask_migrate import upgrade
+    try:
+        upgrade()
+    except Exception as e:
+        print(f"Migration skipped (tables may already exist): {e}")
+        db.create_all()
 
 app.register_blueprint(auth_bp)
 

@@ -8,7 +8,6 @@
 
 {% block content %}
 <div class="quiz-page">
-    <span id="quizMeta" data-total="{{ total_questions }}" style="display:none"></span>
     <!-- Topbar -->
     <header class="quiz-topbar">
         <a href="{{ url_for('study_room', pdf_id=doc.id) }}" class="back-link">
@@ -27,7 +26,7 @@
             <div class="quiz-progress-bar">
                 <div class="quiz-progress-bar-fill" id="progressBar" style="width: 0%"></div>
             </div>
-            <span class="quiz-counter" id="questionCounter">Q1 of {{ total_questions }}</span>
+            <span class="quiz-counter" id="questionCounter">Q1 of <span id="totalQuestionsDisplay">5</span></span>
         </div>
 
         <div class="quiz-timer">
@@ -41,8 +40,13 @@
         <!-- Question Area -->
         <div class="quiz-question-area" id="questionArea">
             <div class="quiz-loading" id="quizLoading">
-                <i class="bi bi-arrow-repeat" style="animation: spin 1s linear infinite; display: inline-block;"></i>
-                <p class="quiz-loading-text">Generating questions...</p>
+                <label style="margin-bottom:0.75rem;font-weight:600;color:var(--text);">Number of Questions (1-5):</label>
+                <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;">
+                    <input type="number" id="quizCount" value="5" min="1" max="5" class="form-input" style="width:80px;text-align:center;">
+                    <button class="btn btn-primary" id="generateQuizBtn">
+                        <i class="bi bi-wand-magic"></i> Generate Quiz
+                    </button>
+                </div>
             </div>
 
             <div class="quiz-question-content" id="questionContent" style="display: none;">
@@ -95,7 +99,7 @@
                 </div>
                 <div class="quiz-nav-stat">
                     <span class="quiz-nav-stat-label">Remaining</span>
-                    <span class="quiz-nav-stat-value" id="remainingCount">{{ total_questions }}</span>
+                    <span class="quiz-nav-stat-value" id="remainingCount">5</span>
                 </div>
             </div>
         </aside>
@@ -124,7 +128,7 @@
 {% block extra_js %}
 <script>
 const pdfId = '{{ doc.id }}';
-const totalQuestions = parseInt(document.getElementById('quizMeta').dataset.total);
+let totalQuestions = 5;
 
 let questions = [];
 let currentQuestion = 0;
@@ -355,7 +359,15 @@ async function loadQuestions() {
     }
 }
 
-// Initialize
-loadQuestions();
+// Generate button
+document.getElementById('generateQuizBtn').addEventListener('click', () => {
+    totalQuestions = parseInt(document.getElementById('quizCount').value) || 5;
+    document.getElementById('quizCount').disabled = true;
+    document.getElementById('generateQuizBtn').disabled = true;
+    document.getElementById('generateQuizBtn').innerHTML = '<i class="bi bi-arrow-repeat" style="animation: spin 1s linear infinite;display:inline-block;"></i> Generating...';
+    document.getElementById('totalQuestionsDisplay').textContent = totalQuestions;
+    document.getElementById('remainingCount').textContent = totalQuestions;
+    loadQuestions();
+});
 </script>
 {% endblock %}

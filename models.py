@@ -42,5 +42,6 @@ class Document(db.Model):
     num_chunks    = db.Column(db.Integer, default=0)
     total_pages   = db.Column(db.Integer, default=0)
     status        = db.Column(db.String(20), default="processing")
+    mcqs          = db.Column(db.JSON, nullable=True)
     error_message = db.Column(db.Text, default="")
     created_at    = db.Column(db.DateTime, server_default=db.func.now())
