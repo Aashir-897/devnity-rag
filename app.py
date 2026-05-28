@@ -11,7 +11,7 @@ from flask_login import LoginManager, login_required, login_user, current_user
 from flask_migrate import Migrate
 
 from config import TEMP_DIR, IMAGES_DIR, PDFS_DIR, PORT, HOST, DEBUG, DATABASE_URL, SESSION_SECRET
-from models import db, User
+from models import db, User, Document
 from routes.auth import auth_bp
 from services.pdf_processor import process_pdf, is_text_empty
 from services.ocr_service   import run_ocr_on_pdf_page
