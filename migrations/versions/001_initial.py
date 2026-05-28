@@ -10,36 +10,42 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        "users",
-        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column("email", sa.String(length=120), nullable=False, index=True),
-        sa.Column("password_hash", sa.String(length=256), nullable=False),
-        sa.Column("is_verified", sa.Boolean(), server_default="0", nullable=True),
-        sa.Column("verification_token", sa.String(length=100), nullable=True, index=True),
-        sa.Column("reset_token", sa.String(length=100), nullable=True, index=True),
-        sa.Column("reset_token_expires", sa.DateTime(), nullable=True),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=True),
-        sa.PrimaryKeyConstraint("id"),
-    )
-    op.create_table(
-        "documents",
-        sa.Column("id", sa.String(length=36), nullable=False),
-        sa.Column("user_id", sa.Integer(), nullable=False, index=True),
-        sa.Column("original_name", sa.String(length=255), nullable=False),
-        sa.Column("storage_key", sa.String(length=512), server_default="", nullable=True),
-        sa.Column("summary", sa.Text(), server_default="", nullable=True),
-        sa.Column("full_text", sa.Text(), server_default="", nullable=True),
-        sa.Column("lines_data", sa.JSON(), nullable=True),
-        sa.Column("num_chunks", sa.Integer(), server_default="0", nullable=True),
-        sa.Column("total_pages", sa.Integer(), server_default="0", nullable=True),
-        sa.Column("status", sa.String(length=20), server_default="processing", nullable=True),
-        sa.Column("mcqs", sa.JSON(), nullable=True),
-        sa.Column("error_message", sa.Text(), server_default="", nullable=True),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=True),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"],),
-        sa.PrimaryKeyConstraint("id"),
-    )
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER AUTO_INCREMENT,
+            email VARCHAR(120) NOT NULL,
+            password_hash VARCHAR(256) NOT NULL,
+            is_verified BOOLEAN DEFAULT 0,
+            verification_token VARCHAR(100),
+            reset_token VARCHAR(100),
+            reset_token_expires DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id)
+        )
+    """)
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS documents (
+            id VARCHAR(36),
+            user_id INTEGER NOT NULL,
+            original_name VARCHAR(255) NOT NULL,
+            storage_key VARCHAR(512) DEFAULT '',
+            summary TEXT DEFAULT '',
+            full_text TEXT DEFAULT '',
+            lines_data JSON,
+            num_chunks INTEGER DEFAULT 0,
+            total_pages INTEGER DEFAULT 0,
+            status VARCHAR(20) DEFAULT 'processing',
+            mcqs JSON,
+            error_message TEXT DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    """)
+    op.create_unique_constraint(None, "users", ["email"])
+    op.create_index(None, "users", ["verification_token"])
+    op.create_index(None, "users", ["reset_token"])
+    op.create_index(None, "documents", ["user_id"])
 
 
 def downgrade() -> None:

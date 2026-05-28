@@ -60,6 +60,13 @@ with app.app_context():
     except Exception as e:
         print(f"Migration skipped (tables may already exist): {e}")
         db.create_all()
+        import sqlalchemy as sa
+        try:
+            with db.engine.connect() as conn:
+                conn.execute(sa.text("ALTER TABLE documents ADD COLUMN mcqs JSON"))
+                conn.commit()
+        except Exception:
+            pass  # column already exists
 
 app.register_blueprint(auth_bp)
 
