@@ -263,19 +263,24 @@ def _get_doc_or_404(pdf_id):
 @app.route("/mcqs", methods=["POST"])
 @login_required
 def get_mcqs():
-    """Generate MCQs from a processed PDF."""
+    """Generate MCQs from a processed PDF (cached)."""
     data = request.json
     pdf_id       = data.get("pdf_id")
-    num_questions = data.get("num_questions", 5)
+    num_questions = max(1, min(data.get("num_questions", 5), 5))
 
     doc = _get_doc_or_404(pdf_id)
     if not doc:
         return jsonify({"error": "PDF not found"}), 404
 
+    if doc.mcqs and isinstance(doc.mcqs, list) and len(doc.mcqs) >= num_questions:
+        return jsonify({"pdf_id": pdf_id, "mcqs": doc.mcqs[:num_questions], "cached": True})
+
     text = doc.full_text or doc.summary or ""
     mcqs = generate_mcqs(text, num_questions=num_questions)
+    doc.mcqs = mcqs
+    db.session.commit()
 
-    return jsonify({"pdf_id": pdf_id, "mcqs": mcqs})
+    return jsonify({"pdf_id": pdf_id, "mcqs": mcqs, "cached": False})
 
 
 @app.route("/qa", methods=["POST"])
