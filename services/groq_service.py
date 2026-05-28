@@ -245,6 +245,44 @@ Provide a clear, accurate answer based on the context above, with citations."""
     )
 
 
+# ── Takeaways ─────────────────────────────────────────────────
+
+def generate_takeaways(text: str) -> list[dict]:
+    prompt = f"""You are an expert document analyst extracting key insights.
+
+Analyze the following text and extract the 4-5 most important takeaways (insights, conclusions, or critical facts). Each takeaway should be a concise, standalone statement that captures a significant point.
+
+RESPONSE FORMAT (strict JSON array):
+[
+  {{
+    "text": "A concise takeaway statement based on the document.",
+    "icon": "bi-bullseye"
+  }}
+]
+
+Choose the icon for each takeaway from: bi-bullseye, bi-lightning-charge-fill, bi-plug-fill, bi-bar-chart-fill, bi-stars, bi-graph-up-arrow, bi-gear-fill, bi-rocket-takeoff-fill
+
+TEXT:
+{text[:10000]}
+
+Return ONLY the JSON array, no extra text."""
+
+    raw = _chat(
+        messages=[{"role": "user", "content": prompt}],
+        model_hf=HF_TEXT_MODEL,
+        model_groq=GROQ_TEXT_MODEL,
+        temperature=0.3,
+        max_tokens=1500,
+    ).strip()
+
+    start = raw.find("[")
+    end = raw.rfind("]") + 1
+    if start != -1 and end > start:
+        raw = raw[start:end]
+
+    return json.loads(raw)
+
+
 # ── Image Understanding ───────────────────────────────────────────────────────
 
 def understand_image(image_path: str, context: str = "") -> str:

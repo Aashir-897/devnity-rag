@@ -531,29 +531,39 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// Takeaways (mock data for demo)
+// Takeaways — dynamically loaded from LLM
 const takeawaysGrid = document.getElementById('takeawaysGrid');
-const takeawayIcons = ['bi-bullseye', 'bi-lightning-charge-fill', 'bi-plug-fill', 'bi-bar-chart-fill'];
-const takeawayColors = ['icon-1', 'icon-2', 'icon-3', 'icon-4'];
-const takeaways = [
-    'Microservices architecture enables independent scaling and deployment of services, leading to faster development cycles and improved fault isolation.',
-    'Event-driven architecture and eventual consistency models are essential for building resilient distributed systems that can handle high-scale workloads.',
-    'API gateways and service meshes provide critical infrastructure for managing service-to-service communication, security, and observability.',
-    'Domain-driven design principles help create bounded contexts that align software architecture with business requirements and improve maintainability.'
-];
 
-takeawaysGrid.innerHTML = takeaways.map((text, i) => `
-    <div class="takeaway-card">
-        <div class="takeaway-header">
-            <div class="takeaway-icon ${takeawayColors[i]}">
-                <i class="bi ${takeawayIcons[i]}"></i>
-            </div>
-            <div>
-                <h3 class="takeaway-title">Key Insight ${i + 1}</h3>
-                <p class="takeaway-text">${text}</p>
-            </div>
-        </div>
-    </div>
-`).join('');
+async function loadTakeaways() {
+    try {
+        const response = await fetch('/takeaways', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pdf_id: docId })
+        });
+        const data = await response.json();
+        if (data.takeaways && data.takeaways.length > 0) {
+            takeawaysGrid.innerHTML = data.takeaways.map((t, i) => `
+                <div class="takeaway-card">
+                    <div class="takeaway-header">
+                        <div class="takeaway-icon icon-${(i % 4) + 1}">
+                            <i class="bi ${t.icon || 'bi-bullseye'}"></i>
+                        </div>
+                        <div>
+                            <h3 class="takeaway-title">Key Insight ${i + 1}</h3>
+                            <p class="takeaway-text">${t.text}</p>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            takeawaysGrid.innerHTML = '<p style="color:var(--muted);text-align:center;padding:2rem;">No takeaways generated.</p>';
+        }
+    } catch (err) {
+        takeawaysGrid.innerHTML = '<p style="color:var(--error);text-align:center;padding:2rem;">Failed to load takeaways.</p>';
+    }
+}
+
+loadTakeaways();
 </script>
 {% endblock %}

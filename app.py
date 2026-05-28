@@ -17,7 +17,7 @@ from services.ocr_service   import run_ocr_on_pdf_page
 from services.image_service import process_pdf_images, cleanup_images
 from services.embeddings     import chunk_text
 from services.vector_service import store_chunks, retrieve_chunks, delete_pdf_chunks
-from services.groq_service   import generate_summary, generate_mcqs, generate_qa_pairs, answer_question
+from services.groq_service import generate_summary, generate_mcqs, generate_qa_pairs, answer_question, generate_takeaways
 from services import storage_service
 
 
@@ -504,6 +504,21 @@ def analytics_page():
         flash("Complete a quiz first to see analytics.", "error")
         return redirect(url_for("index"))
     return render_template("analytics.html", data=last_result)
+
+
+@app.route("/takeaways", methods=["POST"])
+@login_required
+def get_takeaways():
+    data = request.json
+    pdf_id = data.get("pdf_id")
+    doc = _get_doc_or_404(pdf_id)
+    if not doc:
+        return jsonify({"error": "PDF not found"}), 404
+    text = doc.full_text or doc.summary or ""
+    if not text.strip():
+        return jsonify({"takeaways": []})
+    takeaways = generate_takeaways(text)
+    return jsonify({"takeaways": takeaways})
 
 
 @app.route("/health", methods=["GET"])
