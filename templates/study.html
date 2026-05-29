@@ -468,8 +468,15 @@ chatInput.addEventListener('keypress', (e) => {
 });
 
 // Chat mobile toggle
-document.getElementById('chatToggle').addEventListener('click', () => {
-    document.querySelector('.chat-panel').classList.toggle('open');
+const chatPanel = document.querySelector('.chat-panel');
+const chatToggleBtn = document.getElementById('chatToggle');
+chatToggleBtn.addEventListener('click', () => {
+    chatPanel.classList.toggle('open');
+});
+document.addEventListener('click', (e) => {
+    if (!chatPanel.contains(e.target) && !chatToggleBtn.contains(e.target)) {
+        chatPanel.classList.remove('open');
+    }
 });
 
 // Restore chat history from localStorage
