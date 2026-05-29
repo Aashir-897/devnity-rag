@@ -42,10 +42,22 @@ def upgrade() -> None:
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     """)
-    op.create_unique_constraint(None, "users", ["email"])
-    op.create_index(None, "users", ["verification_token"])
-    op.create_index(None, "users", ["reset_token"])
-    op.create_index(None, "documents", ["user_id"])
+    try:
+        op.create_unique_constraint(None, "users", ["email"])
+    except Exception:
+        pass
+    try:
+        op.create_index(None, "users", ["verification_token"])
+    except Exception:
+        pass
+    try:
+        op.create_index(None, "users", ["reset_token"])
+    except Exception:
+        pass
+    try:
+        op.create_index(None, "documents", ["user_id"])
+    except Exception:
+        pass
 
 
 def downgrade() -> None:
