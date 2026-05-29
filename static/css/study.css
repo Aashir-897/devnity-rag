@@ -348,17 +348,33 @@
 }
 
 .chat-panel {
-    width: 320px;
+    width: 85vw;
+    max-width: 320px;
     background: var(--surface);
     border-left: 1px solid var(--border);
-    display: flex;
     flex-direction: column;
     flex-shrink: 0;
     display: none;
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    z-index: 1000;
+    box-shadow: -4px 0 20px rgba(0,0,0,0.15);
 }
 
+.chat-panel.open { display: flex; }
+
 @media (min-width: 1280px) {
-    .chat-panel { display: flex; }
+    .chat-panel {
+        display: flex;
+        position: static;
+        width: 320px;
+        max-width: 320px;
+        height: auto;
+        box-shadow: none;
+    }
+    #chatToggle { display: none; }
 }
 
 .chat-header {

@@ -64,6 +64,9 @@
                 <i class="bi bi-lightning-charge"></i>
                 <span>Generate Quiz</span>
             </a>
+            <button class="btn btn-sm" id="chatToggle" title="Toggle Chat">
+                <i class="bi bi-chat-dots"></i>
+            </button>
         </header>
 
         <!-- Tabs -->
@@ -462,6 +465,11 @@ async function sendChat() {
 chatSendBtn.addEventListener('click', sendChat);
 chatInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') sendChat();
+});
+
+// Chat mobile toggle
+document.getElementById('chatToggle').addEventListener('click', () => {
+    document.querySelector('.chat-panel').classList.toggle('open');
 });
 
 // Restore chat history from localStorage
