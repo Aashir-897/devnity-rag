@@ -514,6 +514,8 @@
 .chat-send-btn:hover { background: var(--accent-hover); }
 .chat-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+#chatToggle { touch-action: manipulation; }
+
 .chat-thinking {
     display: flex;
     justify-content: flex-start;
