@@ -54,28 +54,24 @@ def _chat(messages, model_hf, model_groq, temperature=0.3, max_tokens=1000, imag
 # ── Summary ───────────────────────────────────────────────────────────────────
 
 def generate_summary(text: str) -> str:
-    prompt = f"""You are an expert document analyst.
+    prompt = f"""Analyze the following text and provide a concise, plain-text summary (max 400 words).
 
-Analyze the following text and provide a clear, structured summary.
-Adjust the depth and length of your summary to match the document — concise for short or simple documents, detailed for long or complex ones.
+Do NOT use markdown formatting (no **, #, or dashes).
 
 Include:
-1. **Main Topic** — what this document is about
-2. **Key Points** — the most important information, proportional to content
-3. **Important Concepts** — any technical terms or key concepts explained
-4. **Conclusion** — main takeaway
+1. Main Topic — what this document is about (1-2 sentences)
+2. Key Points — 3-5 essential points, each 1 sentence
+3. Conclusion — main takeaway (1 sentence)
 
 TEXT:
-{text[:10000]}
-
-Provide a well-structured, informative summary."""
+{text[:10000]}"""
 
     return _chat(
         messages=[{"role": "user", "content": prompt}],
         model_hf=HF_TEXT_MODEL,
         model_groq=GROQ_TEXT_MODEL,
         temperature=0.3,
-        max_tokens=1500,
+        max_tokens=700,
     )
 
 
@@ -281,6 +277,64 @@ Return ONLY the JSON array, no extra text."""
         raw = raw[start:end]
 
     return json.loads(raw)
+
+
+# ── Terminology ─────────────────────────────────────────
+def generate_terminology(text: str) -> list[dict]:
+    prompt = f"""Extract 5-10 key technical terms, jargon, or specialized vocabulary from the document.
+
+For each term, provide a clear definition in the context of how it is used in this document.
+These should be DIFFERENT from general takeaways — they are definitions of specific terminology, not insights or conclusions.
+
+RESPONSE FORMAT (strict JSON array):
+[
+  {{
+    "term": "The word or phrase",
+    "definition": "Clear definition in context of the document."
+  }}
+]
+
+TEXT:
+{text[:10000]}
+
+Return ONLY the JSON array, no extra text."""
+
+    raw = _chat(
+        messages=[{"role": "user", "content": prompt}],
+        model_hf=HF_TEXT_MODEL,
+        model_groq=GROQ_TEXT_MODEL,
+        temperature=0.3,
+        max_tokens=1000,
+    ).strip()
+
+    start = raw.find("[")
+    end = raw.rfind("]") + 1
+    if start != -1 and end > start:
+        raw = raw[start:end]
+
+    return json.loads(raw)
+
+
+# ── Document Classification ──────────────────────────────
+
+def classify_document(text: str) -> str:
+    prompt = f"""Classify this document into exactly one word: educational, transactional, legal, technical, creative, or other.
+
+Return ONLY the word, nothing else.
+
+TEXT:
+{text[:2000]}"""
+
+    raw = _chat(
+        messages=[{"role": "user", "content": prompt}],
+        model_hf=HF_TEXT_MODEL,
+        model_groq=GROQ_TEXT_MODEL,
+        temperature=0,
+        max_tokens=10,
+    ).strip().lower()
+
+    valid = {"educational", "transactional", "legal", "technical", "creative"}
+    return raw if raw in valid else "other"
 
 
 # ── Image Understanding ───────────────────────────────────────────────────────

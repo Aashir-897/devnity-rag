@@ -18,7 +18,7 @@ from services.ocr_service   import run_ocr_on_pdf_page
 from services.image_service import process_pdf_images, cleanup_images
 from services.embeddings     import chunk_text
 from services.vector_service import store_chunks, retrieve_chunks, delete_pdf_chunks
-from services.groq_service import generate_summary, generate_mcqs, generate_qa_pairs, answer_question, generate_takeaways
+from services.groq_service import generate_summary, generate_mcqs, generate_qa_pairs, answer_question, generate_takeaways, generate_terminology, classify_document
 from services import storage_service
 
 
@@ -64,9 +64,11 @@ with app.app_context():
         try:
             with db.engine.connect() as conn:
                 conn.execute(sa.text("ALTER TABLE documents ADD COLUMN mcqs JSON"))
+                conn.execute(sa.text("ALTER TABLE documents ADD COLUMN qa_pairs JSON"))
+                conn.execute(sa.text("ALTER TABLE documents ADD COLUMN doc_type VARCHAR(20) DEFAULT 'unknown'"))
                 conn.commit()
         except Exception:
-            pass  # column already exists
+            pass  # columns already exist
 
 app.register_blueprint(auth_bp)
 
@@ -153,6 +155,9 @@ def _process_pdf_background(pdf_path, filename, pdf_id, user_id):
             _update_status(user_id, pdf_id, "Summary", 80, "Step 5: Generating summary...")
             summary = generate_summary(combined_text)
 
+            _update_status(user_id, pdf_id, "Classification", 85, "Step 6: Classifying document type...")
+            doc_type = classify_document(combined_text)
+
             # Save PDF permanently for viewer
             storage_key = storage_service.upload_file(pdf_path, pdf_id)
 
@@ -165,6 +170,7 @@ def _process_pdf_background(pdf_path, filename, pdf_id, user_id):
             # Update Document record in DB
             doc = db.session.get(Document, pdf_id)
             if doc:
+                doc.doc_type = doc_type
                 doc.summary = summary
                 doc.full_text = combined_text
                 doc.lines_data = lines_data
@@ -275,6 +281,9 @@ def get_mcqs():
     if not doc:
         return jsonify({"error": "PDF not found"}), 404
 
+    if doc.doc_type and doc.doc_type not in ("educational", "technical", "unknown"):
+        return jsonify({"error": "This document type is not suitable for quiz generation.", "doc_type": doc.doc_type}), 400
+
     if doc.mcqs and isinstance(doc.mcqs, list) and len(doc.mcqs) >= num_questions:
         return jsonify({"pdf_id": pdf_id, "mcqs": doc.mcqs[:num_questions], "cached": True})
 
@@ -289,19 +298,34 @@ def get_mcqs():
 @app.route("/qa", methods=["POST"])
 @login_required
 def get_qa():
-    """Generate Q&A pairs from a processed PDF."""
+    """Generate Q&A pairs from a processed PDF (cached + conflict modal)."""
     data = request.json
     pdf_id    = data.get("pdf_id")
-    num_pairs = data.get("num_pairs", 5)
+    num_pairs = max(1, min(data.get("num_pairs", 5), 5))
+    force     = data.get("force", False)
 
     doc = _get_doc_or_404(pdf_id)
     if not doc:
         return jsonify({"error": "PDF not found"}), 404
 
+    if doc.doc_type and doc.doc_type not in ("educational", "technical", "unknown"):
+        return jsonify({"error": "This document type is not suitable for Q&A.", "doc_type": doc.doc_type}), 400
+
+    if not force and doc.qa_pairs and isinstance(doc.qa_pairs, list):
+        if len(doc.qa_pairs) >= num_pairs:
+            return jsonify({"qa_pairs": doc.qa_pairs[:num_pairs], "cached": True})
+        else:
+            return jsonify({
+                "conflict": True, "cached_count": len(doc.qa_pairs), "requested": num_pairs,
+                "message": f"Already have {len(doc.qa_pairs)} Q&A pairs. Generate {num_pairs} fresh ones?"
+            })
+
     text = doc.full_text or doc.summary or ""
     pairs = generate_qa_pairs(text, num_pairs=num_pairs)
+    doc.qa_pairs = pairs
+    db.session.commit()
 
-    return jsonify({"pdf_id": pdf_id, "qa_pairs": pairs})
+    return jsonify({"qa_pairs": pairs, "cached": False})
 
 
 @app.route("/chat", methods=["POST"])
@@ -522,11 +546,30 @@ def get_takeaways():
     doc = _get_doc_or_404(pdf_id)
     if not doc:
         return jsonify({"error": "PDF not found"}), 404
+    if doc.doc_type and doc.doc_type not in ("educational", "technical", "unknown"):
+        return jsonify({"error": "This document type is not suitable for takeaways.", "doc_type": doc.doc_type}), 400
     text = doc.full_text or doc.summary or ""
     if not text.strip():
         return jsonify({"takeaways": []})
     takeaways = generate_takeaways(text)
     return jsonify({"takeaways": takeaways})
+
+
+@app.route("/terminology", methods=["POST"])
+@login_required
+def get_terminology():
+    data = request.json
+    pdf_id = data.get("pdf_id")
+    doc = _get_doc_or_404(pdf_id)
+    if not doc:
+        return jsonify({"error": "PDF not found"}), 404
+    if doc.doc_type and doc.doc_type not in ("educational", "technical", "unknown"):
+        return jsonify({"error": "This document type is not suitable for terminology.", "doc_type": doc.doc_type}), 400
+    text = doc.full_text or doc.summary or ""
+    if not text.strip():
+        return jsonify({"terms": []})
+    terms = generate_terminology(text)
+    return jsonify({"terms": terms})
 
 
 @app.route("/health", methods=["GET"])

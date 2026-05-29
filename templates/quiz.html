@@ -341,6 +341,10 @@ async function loadQuestions() {
         });
 
         const data = await response.json();
+        if (!response.ok) {
+            quizLoading.innerHTML = `<i class="bi bi-exclamation-triangle" style="color: var(--error);"></i><p class="quiz-loading-text">${data.error || data.message || 'Failed to generate questions.'}</p>`;
+            return;
+        }
         questions = data.mcqs || [];
 
         quizLoading.style.display = 'none';

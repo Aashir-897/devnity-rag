@@ -84,7 +84,7 @@
                     {% for point in doc.summary.split('\n') if point.strip() %}
                     <div class="summary-point">
                         <div class="summary-point-dot"></div>
-                        <p class="summary-point-text">{{ point.strip() }}</p>
+                        <p class="summary-point-text">{{ point.strip() | replace('**', '') | replace('### ', '') | replace('## ', '') | replace('# ', '') | replace('* ', '') | replace('- ', '') }}</p>
                     </div>
                     {% endfor %}
                 </div>
@@ -209,6 +209,25 @@
     </aside>
 </div>
 {% endblock %}
+<div class="modal-overlay" id="qaConflictModal" style="display:none">
+    <div class="modal-box">
+        <p id="qaConflictMsg"></p>
+        <div class="modal-actions">
+            <button class="btn btn-outline" id="qaUseExisting">Use Existing</button>
+            <button class="btn btn-primary" id="qaGenerateNew">Generate New</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center}
+.modal-box{background:var(--surface);border-radius:12px;padding:2rem;max-width:400px;width:90%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.3)}
+.modal-box p{margin-bottom:1.5rem;color:var(--text);line-height:1.5}
+.modal-actions{display:flex;gap:0.75rem;justify-content:center}
+.modal-actions .btn{padding:0.6rem 1.5rem;border-radius:8px;cursor:pointer;font-weight:600;border:none}
+.modal-actions .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+.modal-actions .btn-primary{background:var(--primary);color:white}
+</style>
 
 {% block extra_js %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -257,6 +276,10 @@ terminologyToggle.addEventListener('click', async () => {
                 body: JSON.stringify({ pdf_id: docId })
             });
             const data = await response.json();
+            if (!response.ok) {
+                terminologyContent.innerHTML = `<p style="text-align:center;color:var(--error);">${data.error || data.message || 'Failed to generate terminology.'}</p>`;
+                return;
+            }
             if (data.terms && data.terms.length > 0) {
                 terminologyContent.innerHTML = data.terms.map(t => `
                     <div class="terminology-item">
@@ -279,18 +302,46 @@ const generateQABtn = document.getElementById('generateQA');
 const qaCountInput = document.getElementById('qaCount');
 const qaContent = document.getElementById('qaContent');
 
-generateQABtn.addEventListener('click', async () => {
+async function generateQA(force) {
     const count = parseInt(qaCountInput.value) || 5;
     generateQABtn.disabled = true;
     generateQABtn.innerHTML = '<i class="bi bi-arrow-repeat" style="animation: spin 1s linear infinite;"></i> Generating...';
 
     try {
+        const body = { pdf_id: docId, num_pairs: count };
+        if (force) body.force = true;
         const response = await fetch('/qa', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pdf_id: docId, num_pairs: count })
+            body: JSON.stringify(body)
         });
         const data = await response.json();
+
+        if (!response.ok) {
+            qaContent.innerHTML = `<p style="text-align:center;color:var(--error);padding:2rem;">${data.error || data.message || 'Failed to generate Q&A.'}</p>`;
+            return;
+        }
+
+        if (data.conflict) {
+            document.getElementById('qaConflictMsg').textContent = data.message;
+            document.getElementById('qaConflictModal').style.display = 'flex';
+            document.getElementById('qaGenerateNew').onclick = () => {
+                document.getElementById('qaConflictModal').style.display = 'none';
+                generateQA(true);
+            };
+            document.getElementById('qaUseExisting').onclick = () => {
+                document.getElementById('qaConflictModal').style.display = 'none';
+                fetch('/qa', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pdf_id: docId, num_pairs: data.cached_count }) })
+                    .then(r => r.json()).then(d => {
+                        if (d.qa_pairs) {
+                            localStorage.setItem('qa_' + docId, JSON.stringify(d.qa_pairs));
+                            renderQAPairs(d.qa_pairs);
+                        }
+                    });
+            };
+            return;
+        }
+
         if (data.qa_pairs && data.qa_pairs.length > 0) {
             localStorage.setItem('qa_' + docId, JSON.stringify(data.qa_pairs));
             renderQAPairs(data.qa_pairs);
@@ -303,7 +354,9 @@ generateQABtn.addEventListener('click', async () => {
 
     generateQABtn.disabled = false;
     generateQABtn.innerHTML = '<i class="bi bi-wand-magic"></i> Generate Q&A';
-});
+}
+
+generateQABtn.addEventListener('click', () => generateQA(false));
 
 // Chat functionality
 const chatInput = document.getElementById('chatInput');
@@ -542,6 +595,10 @@ async function loadTakeaways() {
             body: JSON.stringify({ pdf_id: docId })
         });
         const data = await response.json();
+        if (!response.ok) {
+            takeawaysGrid.innerHTML = `<p style="text-align:center;color:var(--error);padding:2rem;">${data.error || data.message || 'Failed to load takeaways.'}</p>`;
+            return;
+        }
         if (data.takeaways && data.takeaways.length > 0) {
             takeawaysGrid.innerHTML = data.takeaways.map((t, i) => `
                 <div class="takeaway-card">
