@@ -17,7 +17,7 @@
         <h1 class="analytics-banner-title">
             {% if data.percentage >= 60 %}Congratulations! Assessment Completed.{% else %}Assessment Completed.{% endif %}
         </h1>
-        <p class="analytics-banner-subtitle">{{ data.pdf_id if data.pdf_id else 'Quiz completed' }}</p>
+        <p class="analytics-banner-subtitle">{{ data.doc_name }}</p>
         <div class="analytics-banner-actions">
             <a href="{{ url_for('index') }}" class="btn" style="background: var(--success); color: white;">
                 <i class="bi bi-grid-1x2-fill"></i>

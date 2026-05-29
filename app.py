@@ -11,7 +11,7 @@ from flask_login import LoginManager, login_required, login_user, current_user
 from flask_migrate import Migrate
 
 from config import TEMP_DIR, IMAGES_DIR, PDFS_DIR, PORT, HOST, DEBUG, DATABASE_URL, SESSION_SECRET
-from models import db, User, Document
+from models import db, User, Document, QuizResult
 from routes.auth import auth_bp
 from services.pdf_processor import process_pdf, is_text_empty
 from services.ocr_service   import run_ocr_on_pdf_page
@@ -59,16 +59,16 @@ with app.app_context():
         upgrade()
     except Exception as e:
         print(f"Migration skipped (tables may already exist): {e}")
-        db.create_all()
-        import sqlalchemy as sa
-        try:
-            with db.engine.connect() as conn:
-                conn.execute(sa.text("ALTER TABLE documents ADD COLUMN mcqs JSON"))
-                conn.execute(sa.text("ALTER TABLE documents ADD COLUMN qa_pairs JSON"))
-                conn.execute(sa.text("ALTER TABLE documents ADD COLUMN doc_type VARCHAR(20) DEFAULT 'unknown'"))
-                conn.commit()
-        except Exception:
-            pass  # columns already exist
+    db.create_all()
+    import sqlalchemy as sa
+    try:
+        with db.engine.connect() as conn:
+            conn.execute(sa.text("ALTER TABLE documents ADD COLUMN mcqs JSON"))
+            conn.execute(sa.text("ALTER TABLE documents ADD COLUMN qa_pairs JSON"))
+            conn.execute(sa.text("ALTER TABLE documents ADD COLUMN doc_type VARCHAR(20) DEFAULT 'unknown'"))
+            conn.commit()
+    except Exception:
+        pass  # columns already exist
 
 app.register_blueprint(auth_bp)
 
@@ -84,10 +84,14 @@ def index():
         .order_by(Document.created_at.desc()).all()
     total_docs = len(docs)
     total_chunks = sum(d.num_chunks for d in docs)
+    from sqlalchemy import func
+    avg = db.session.query(func.avg(QuizResult.percentage)).filter(
+        QuizResult.user_id == current_user.id
+    ).scalar()
     stats = {
         "total_docs": total_docs,
         "ai_queries": total_chunks,
-        "avg_score": 0
+        "avg_score": round(avg) if avg else 0,
     }
     return render_template("index.html", documents=docs, stats=stats)
 
@@ -489,8 +493,11 @@ def quiz_submit():
         })
     
     score_pct = round((correct / total) * 100) if total > 0 else 0
+    doc = Document.query.filter_by(id=pdf_id, user_id=current_user.id).first()
+    doc_name = doc.original_name if doc else "Quiz completed"
     result_data = {
         "pdf_id": pdf_id,
+        "doc_name": doc_name,
         "score": correct,
         "total": total,
         "percentage": score_pct,
@@ -498,6 +505,16 @@ def quiz_submit():
         "duration_seconds": duration_seconds,
     }
     session["last_quiz_result"] = result_data
+    try:
+        db.session.add(QuizResult(
+            user_id=current_user.id, document_id=pdf_id,
+            score=correct, total_questions=total,
+            percentage=score_pct, duration_seconds=duration_seconds,
+        ))
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"Failed to save quiz result: {e}")
     return jsonify(result_data)
 
 

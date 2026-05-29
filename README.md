@@ -1,3 +1,13 @@
+---
+title: rag-devnity
+emoji: 🧠
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+app_file: app.py
+pinned: false
+---
+
 # rag-devnity — Intelligent PDF AI System
 
 Upload PDFs, get AI summaries, generate MCQs/quiz, ask questions via RAG chat, and review performance analytics.

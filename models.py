@@ -47,3 +47,16 @@ class Document(db.Model):
     qa_pairs      = db.Column(db.JSON, nullable=True)
     error_message = db.Column(db.Text, default="")
     created_at    = db.Column(db.DateTime, server_default=db.func.now())
+
+
+class QuizResult(db.Model):
+    __tablename__ = "quiz_results"
+
+    id              = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id         = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    document_id     = db.Column(db.String(36), db.ForeignKey("documents.id"), nullable=False)
+    score           = db.Column(db.Integer, nullable=False)
+    total_questions = db.Column(db.Integer, nullable=False)
+    percentage      = db.Column(db.Integer, nullable=False)
+    duration_seconds = db.Column(db.Integer, default=0)
+    created_at      = db.Column(db.DateTime, server_default=db.func.now())
