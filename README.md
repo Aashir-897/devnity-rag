@@ -1,33 +1,28 @@
----
-title: rag-devnity
-emoji: 📘
-colorFrom: blue
-colorTo: indigo
-sdk: docker
-app_file: app.py
-pinned: false
----
-
 # rag-devnity — Intelligent PDF AI System
 
 Upload PDFs, get AI summaries, generate MCQs/quiz, ask questions via RAG chat, and review performance analytics.
 
 ## Features
 
-- **PDF Text Extraction** — extracts text and images from PDFs via PyMuPDF
-- **OCR for Scanned Pages** — automatic PaddleOCR fallback when pages lack extractable text
-- **Image / Chart Analysis** — routes document images to a Vision LLM for description
-- **RAG Q&A** — ask natural-language questions; answers are grounded in retrieved chunks
-- **PDF.js Document Viewer** — inline PDF rendering with page-level line highlighting
-- **MCQ & Quiz Generation** — generate and take timed quizzes; results scored and reviewed
-- **Q&A / Chat Persistence** — Q&A pairs and chat history saved to localStorage, restored on reload
-- **Real-Time Progress** — SSE stream shows processing status (Extract → OCR → Images → Embeddings → Summary → Done)
-- **Performance Analytics** — score dial, topic breakdown charts, question-by-question review with AI remediation notes
+- **PDF Text Extraction** — PyMuPDF-based text + image extraction
+- **OCR for Scanned Pages** — automatic PaddleOCR fallback
+- **Image / Chart Analysis** — Vision LLM description routing
+- **RAG Q&A** — natural-language answers grounded in retrieved chunks
+- **PDF.js Viewer** — inline canvas rendering with line-level highlighting
+- **MCQ & Quiz Generation** — timed quizzes with scoring + review
+- **Key Takeaways & Terminology** — LLM-generated insights and glossary
+- **Document Classification** — educational/non-educational routing
+- **Q&A / Chat Persistence** — localStorage saves pairs and history across reloads
+- **Server-Side Caching** — MCQs, Q&A pairs cached in DB to avoid redundant LLM calls
+- **Real-Time SSE Progress** — Extract → OCR → Images → Embeddings → Summary → Done
+- **Performance Analytics** — score dial, topic breakdown, question review with AI remediation
 
 ## Quick Start
 
 ```powershell
-git clone <repo>
+git clone https://github.com/Aashir-897/devnity-rag.git
+# or
+git clone https://huggingface.co/spaces/Aashirahmed/devnity-pdf-ai
 cd rag-devnity
 .\venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
