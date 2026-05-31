@@ -506,6 +506,7 @@ let pdfViewer = null;
 let pdfScale = 1.5;
 let pdfLoaded = false;
 let linesData = {};
+let pendingScroll = null;
 
 function loadPDFViewer() {
     if (pdfLoaded) return;
@@ -522,7 +523,15 @@ function loadPDFViewer() {
             return fetch('/pdf/' + docId + '/lines');
         })
         .then(r => r.json())
-        .then(d => { linesData = d; })
+        .then(d => {
+            linesData = d;
+            if (pendingScroll) {
+                setTimeout(() => {
+                    doScroll(pendingScroll.pageNum, pendingScroll.lineNum, pendingScroll.count);
+                    pendingScroll = null;
+                }, 800);
+            }
+        })
         .catch(e => {
             console.error('PDF load error:', e);
             document.getElementById('pdfViewerPlaceholder').innerHTML = '<i class="bi bi-exclamation-triangle"></i><p>Failed to load PDF.</p>';
@@ -567,16 +576,20 @@ function highlightLine(pageNum, lineNum, count = 4) {
     }
 }
 
+function doScroll(pageNum, lineNum, count) {
+    const el = document.getElementById('pdf-page-' + pageNum);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (lineNum) setTimeout(() => highlightLine(pageNum, lineNum, count || 4), 600);
+}
+
 function scrollToPage(pageNum, lineNum, count) {
     if (!pdfLoaded) loadPDFViewer();
     document.querySelector('.study-tab[data-tab="view"]').click();
-    const el = document.getElementById('pdf-page-' + pageNum);
-    if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!pdfViewer) {
+        pendingScroll = { pageNum, lineNum, count: count || 4 };
+        return;
     }
-    if (lineNum) {
-        setTimeout(() => highlightLine(pageNum, lineNum, count || 4), 600);
-    }
+    doScroll(pageNum, lineNum, count);
 }
 
 function renderQAPairs(pairs) {

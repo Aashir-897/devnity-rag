@@ -57,6 +57,12 @@ CHUNK_OVERLAP = 150
 # ── Retrieval ─────────────────────────────────────────
 TOP_K_CHUNKS = 5
 
+# ── Hybrid Search ─────────────────────────────────────
+BM25_WEIGHT   = 0.3    # weight for BM25 score in RRF
+VECTOR_WEIGHT = 0.7    # weight for vector score in RRF
+RERANK_TOP_K  = 15     # how many candidates to rerank
+FINAL_TOP_K   = 5      # final results after rerank
+
 # ── Email ─────────────────────────────────────────────
 APP_URL = os.getenv("APP_URL", "https://rag.devnity.me")
 

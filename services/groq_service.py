@@ -51,6 +51,38 @@ def _chat(messages, model_hf, model_groq, temperature=0.3, max_tokens=1000, imag
     raise RuntimeError("No LLM available — set HF_TOKEN or GROQ_API_KEY")
 
 
+def _chat_stream(messages, model_hf, model_groq, temperature=0.3, max_tokens=1000):
+    """Generator — yields text chunks as they arrive from the LLM."""
+    hf = _get_hf()
+    if hf:
+        try:
+            stream = hf.chat.completions.create(
+                model=model_hf, messages=messages,
+                temperature=temperature, max_tokens=max_tokens, stream=True,
+            )
+            for chunk in stream:
+                delta = chunk.choices[0].delta.content or ""
+                if delta:
+                    yield delta
+            return
+        except Exception as e:
+            print(f"HF stream failed, fallback to Groq: {e}")
+
+    groq = _get_groq()
+    if groq:
+        stream = groq.chat.completions.create(
+            model=model_groq, messages=messages,
+            temperature=temperature, max_tokens=max_tokens, stream=True,
+        )
+        for chunk in stream:
+            delta = chunk.choices[0].delta.content or ""
+            if delta:
+                yield delta
+        return
+
+    raise RuntimeError("No LLM available — set HF_TOKEN or GROQ_API_KEY")
+
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 
 def generate_summary(text: str) -> str:
@@ -209,28 +241,38 @@ Return ONLY the JSON array, no extra text."""
 def answer_question(question: str, context_chunks: list[str]) -> str:
     context = "\n\n---\n\n".join(context_chunks)
 
-    prompt = f"""You are a helpful assistant answering questions about a document.
+    prompt = f"""You are Devnity AI, an expert, highly structured, and concise study companion. Your primary task is to help the user learn by providing accurate answers strictly based on the provided document context.
 
-Based on the context below, identify the document type (educational, technical, business, creative/literary, news, or general) and tailor your answer accordingly:
+### SYSTEM INSTRUCTIONS & CORE PATTERNS:
 
-- **Educational** → explain concepts clearly with examples, focus on understanding
-- **Technical** → be precise, reference specific procedures, specifications, or configurations
-- **Business** → focus on strategy, data, market implications, and decision points
-- **Creative/Literary** → discuss themes, characters, plot, and narrative techniques
-- **News** → provide context, chronology, key facts, and stakeholder implications
-- **General** → clear, direct answers focused on the main information
+1. PERSONA & TONE (Context Enrichment):
+   - Act as an approachable but precise academic mentor. 
+   - Keep answers direct, educational, and clear. Avoid any meta-commentary about the document's layout or structural types (e.g., do NOT say "Based on the technical nature of this text...").
 
-IMPORTANT: The context contains [Page N, Line M] markers. When you use information from the context, cite the source by including the page and line reference in your answer like this: [Page 3, Line 12]. Always attach a citation to each piece of information you use.
+2. STRICT GROUNDING (Direct Retrieval Pattern):
+   - Prioritize facts found directly within the provided CONTEXT.
+   - The context contains '[Page N, Line M]' markers. You MUST cite your sources inline naturally at the exact end of relevant facts or definitions (e.g., "...as defined in quantum dynamics [Page 3, Line 12].").
 
-Use ONLY the provided context to answer. If the answer is not in the context, say:
-"I couldn't find this information in the document."
+3. KNOWLEDGE EXPANSION BOUNDARY (Hybrid Reasoning):
+   - **Scenario A (Concept is mentioned):** If the user asks about a specific term, acronym, or concept that IS explicitly mentioned or referenced in the context, but the text lacks a full definition, you ARE ALLOWED to bring in your general educational knowledge to fully explain it for the user's learning.
+   - **Scenario B (Concept is absent):** If the user asks about a topic that has absolutely no reference, mention, or connection to the provided context, you must strictly trigger the refusal rule.
 
-CONTEXT:
+4. ERROR & NOISE HANDLING:
+   - Ignore any OCR artifacts, messy symbols, or formatting noise in the context. Extract only the core educational concepts.
+
+5. REFUSAL RULE (Error Handling Pattern):
+   - If the question is completely out-of-context or irrelevant to the document's scope, respond EXACTLY with this phrase and nothing else:
+     "I couldn't find this information in the document."
+
+---
+### PROVIDED CONTEXT:
 {context}
+---
 
-QUESTION: {question}
+### USER QUESTION: 
+{question}
 
-Provide a clear, accurate answer based on the context above, with citations."""
+### DEVNITY AI RESPONSE:"""
 
     return _chat(
         messages=[{"role": "user", "content": prompt}],
@@ -238,8 +280,7 @@ Provide a clear, accurate answer based on the context above, with citations."""
         model_groq=GROQ_TEXT_MODEL,
         temperature=0.2,
         max_tokens=1000,
-    )
-
+    )    
 
 # ── Takeaways ─────────────────────────────────────────────────
 

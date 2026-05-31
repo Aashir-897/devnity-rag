@@ -1,5 +1,6 @@
 """Flask app — PDF upload, RAG chat, MCQ generation, auth."""
 import os
+import re
 import json
 import uuid
 import time
@@ -331,13 +332,12 @@ def get_qa():
 
     return jsonify({"qa_pairs": pairs, "cached": False})
 
-
+SUMMARY_KEYWORDS = ["summarize", "summary", "summarise", "overview", "brief me", "what is this document about"]
 @app.route("/chat", methods=["POST"])
 @login_required
 def chat():
-    """Answer a question using retrieved PDF chunks."""
-    data     = request.json
-    pdf_id   = data.get("pdf_id")
+    data = request.json
+    pdf_id = data.get("pdf_id")
     question = data.get("question", "").strip()
 
     doc = _get_doc_or_404(pdf_id)
@@ -347,7 +347,22 @@ def chat():
     if not question:
         return jsonify({"error": "Question is required"}), 400
 
-    sources = retrieve_chunks(question, pdf_id, user_id=current_user.id, top_k=5)
+    q_lower = question.lower()
+    if any(kw in q_lower for kw in SUMMARY_KEYWORDS):
+        full_text = doc.full_text or doc.summary or ""  
+        summary = generate_summary(full_text)
+        return jsonify({
+            "pdf_id": pdf_id,
+            "question": question,
+            "answer": summary,
+            "sources": []
+        })
+
+    try:
+        sources = retrieve_chunks(question, pdf_id, user_id=current_user.id, top_k=5)
+    except Exception as e:
+        print(f"Chat retrieval error: {e}")
+        return jsonify({"error": "Vector search timed out. Please try again."}), 500
 
     if not sources:
         return jsonify({"answer": "I couldn't find relevant information in this document."})
@@ -355,14 +370,24 @@ def chat():
     chunks_text = [s["text"] for s in sources]
     answer = answer_question(question, chunks_text)
 
+    cited_pages = set()
+    for m in re.finditer(r'\[Page (\d+)(?:, Line (\d+))?\]', answer):
+        cited_pages.add(int(m.group(1)))
+
     chat_sources = []
     for s in sources:
-        chat_sources.append({
-            "text": s["text"],
-            "pages": s.get("pages", []),
-            "lines": s.get("lines", []),
-            "chunk_index": s.get("chunk_index", 0),
-        })
+        matching_pages = [p for p in s.get("pages", []) if p in cited_pages]
+        matching_lines = [l for l in s.get("lines", []) if l.get("page") in cited_pages]
+        if matching_pages:
+            chat_sources.append({
+                "text": s["text"],
+                "pages": matching_pages,
+                "lines": matching_lines,
+                "chunk_index": s.get("chunk_index", 0),
+            })
+
+    if "I couldn't find this information in the document" in answer:
+        chat_sources = []
 
     return jsonify({
         "pdf_id": pdf_id,
